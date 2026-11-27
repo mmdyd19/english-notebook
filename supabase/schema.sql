@@ -44,3 +44,30 @@ revoke all on public.cards from anon;
 -- TRUNCATE 는 RLS 를 무시하고 표 전체를 지울 수 있으므로 반드시 뺀다
 revoke all on public.cards from authenticated;
 grant select, insert, update, delete on public.cards to authenticated;
+
+-- 받은함 · 영어 일기 · 작문 연습
+-- 앱 사용자는 쓰기·읽기·삭제만. 검사 결과(feedback, status)는 Claude 선생님(postgres 권한)만 쓴다.
+create table if not exists public.entries (
+  id           uuid primary key,
+  user_id      uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  kind         text not null check (kind in ('diary','writing','inbox')),
+  title        text check (char_length(title) <= 200),
+  body         text not null check (char_length(body) between 1 and 8000),
+  target_exprs text check (char_length(target_exprs) <= 1000),
+  status       text not null default 'new' check (status in ('new','checked')),
+  feedback     jsonb check (feedback is null or pg_column_size(feedback) <= 60000),
+  created_at   timestamptz not null default now(),
+  checked_at   timestamptz
+);
+create index if not exists entries_user_idx on public.entries (user_id, created_at desc);
+create index if not exists entries_status_idx on public.entries (status) where status = 'new';
+alter table public.entries enable row level security;
+drop policy if exists "own entries select" on public.entries;
+drop policy if exists "own entries insert" on public.entries;
+drop policy if exists "own entries delete" on public.entries;
+create policy "own entries select" on public.entries for select to authenticated using ((select auth.uid()) = user_id);
+create policy "own entries insert" on public.entries for insert to authenticated
+  with check ((select auth.uid()) = user_id and status = 'new' and feedback is null);
+create policy "own entries delete" on public.entries for delete to authenticated using ((select auth.uid()) = user_id);
+revoke all on public.entries from anon, authenticated;
+grant select, insert, delete on public.entries to authenticated;
