@@ -16,18 +16,21 @@
   const FIELDS = [
     ['type', '유형'], ['source', '출처'], ['sentence', '원문 문장'], ['literal', '직역'],
     ['natural', '의역'], ['meaning', '뜻·뉘앙스'], ['register', '격식도'],
-    ['mine', '내 원래 문장'], ['example', '예문'],
+    ['mine', '내 원래 문장'], ['example', '예문'], ['note', '비교·메모'],
   ];
   // 앱 필드 ↔ DB 컬럼
   const COLS = {
     expr: 'expr', type: 'ctype', source: 'source', sentence: 'sentence', literal: 'lit', natural: 'nat',
-    meaning: 'meaning', register: 'formality', mine: 'mine', example: 'example',
+    meaning: 'meaning', register: 'formality', mine: 'mine', example: 'example', note: 'note',
     created: 'created', due: 'due', level: 'level', used: 'used', id: 'id',
   };
   const KEY_ALIASES = {
     '표현': 'expr', '유형': 'type', '출처': 'source', '원문 문장': 'sentence', '원문': 'sentence',
     '직역': 'literal', '의역': 'natural', '뜻·뉘앙스': 'meaning', '뜻': 'meaning', '뉘앙스': 'meaning',
     '뜻/뉘앙스': 'meaning', '격식도': 'register', '내 원래 문장': 'mine', '예문': 'example',
+    '다른 예문': 'example', '추가 예문': 'example', '예문들': 'example',
+    '비교·메모': 'note', '비교/메모': 'note', '비교': 'note', '차이': 'note', '차이점': 'note', '메모': 'note',
+    '참고': 'note', '헷갈리는 표현': 'note', '비슷한 표현과 차이': 'note',
   };
   const MAX_TEXT = 2000;
   const MAX_CARDS = 5000;
@@ -86,8 +89,13 @@
     out.due = validDate(c.due) || today();
     out.level = Number.isInteger(c.level) && c.level >= 0 && c.level < INTERVALS.length ? c.level : 0;
     out.used = c.used === true;
+    // 휴지통: 지운 시각 (ISO). 비어 있으면 살아 있는 카드
+    out.deleted = typeof c.deleted === 'string' && /^\d{4}-\d{2}-\d{2}T[\d:.]+(Z|[+-]\d{2}:?\d{2})?$/.test(c.deleted) ? c.deleted : '';
     return out;
   }
+  const live = () => cards.filter((c) => !c.deleted);
+  const trashed = () => cards.filter((c) => c.deleted);
+  const TRASH_DAYS = 30;
   function validDate(s) { return typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : ''; }
   function today(offsetDays) {
     const d = new Date();
@@ -108,6 +116,7 @@
   function toRow(c) {
     const r = {};
     for (const [k, col] of Object.entries(COLS)) r[col] = c[k];
+    r.deleted_at = c.deleted || null;
     r.updated_at = new Date().toISOString();
     return r;
   }
@@ -116,6 +125,7 @@
     for (const [k, col] of Object.entries(COLS)) c[k] = r[col] == null ? '' : r[col];
     c.level = Number(r.level) || 0;
     c.used = r.used === true;
+    c.deleted = r.deleted_at ? new Date(r.deleted_at).toISOString() : '';
     return sanitizeCard(c);
   }
 
@@ -191,7 +201,8 @@
         } else if (op.op === 'delete' && UUID_RE.test(op.id)) {
           await rest('DELETE', `?id=eq.${op.id}`);
         }
-        pending.shift();
+        // 보내는 사이에 같은 카드가 또 바뀌면 새 작업이 뒤에 붙어 있으므로, 보낸 그 작업만 정확히 뺀다
+        pending = pending.filter((p) => p !== op);
         writeJSON(PENDING_KEY, pending);
       }
       const rows = await rest('GET', '?select=*&order=created.desc&limit=5000');
@@ -202,6 +213,7 @@
         const waiting = pending.filter((p) => p.op === 'upsert').map((p) => p.card);
         const waitIds = new Set(waiting.map((c) => c.id));
         cards = fresh.filter((c) => !deleted.has(c.id) && !waitIds.has(c.id)).concat(waiting);
+        purgeOldTrash();
         if (pending.length) scheduleSync();
         saveLocal();
         renderList();
@@ -340,7 +352,8 @@
     'source': 'source', 'sentence': 'sentence', 'original': 'sentence', 'context': 'sentence',
     'literal': 'literal', 'literal translation': 'literal', 'natural': 'natural', 'translation': 'natural',
     'meaning': 'meaning', 'nuance': 'meaning', 'register': 'register', 'formality': 'register',
-    'my sentence': 'mine', 'original sentence (mine)': 'mine', 'example': 'example',
+    'my sentence': 'mine', 'original sentence (mine)': 'mine', 'example': 'example', 'examples': 'example',
+    'note': 'note', 'notes': 'note', 'comparison': 'note', 'difference': 'note', 'vs': 'note',
   };
   const keyOf = (label) => {
     const k = label.trim().replace(/\s+/g, ' ');
@@ -422,7 +435,7 @@
   function renderTabs() {
     const tabs = $('tabs');
     tabs.replaceChildren();
-    for (const t of ['전체', ...TYPES, '써먹음']) {
+    for (const t of ['전체', ...TYPES]) {
       const b = el('button', 'tab', t);
       b.type = 'button';
       b.setAttribute('aria-pressed', String(t === filter));
@@ -435,21 +448,22 @@
     const list = $('list');
     list.replaceChildren();
     const q = norm(query);
-    const shown = cards
-      .filter((c) => filter === '전체' || (filter === '써먹음' ? c.used : c.type === filter))
+    const alive = live();
+    const shown = alive
+      .filter((c) => filter === '전체' || c.type === filter)
       .filter((c) => !q || norm([c.expr, c.meaning, c.natural, c.sentence, c.example, c.mine].join(' ')).includes(q))
       .sort((a, b) => (a.created < b.created ? 1 : a.created > b.created ? -1 : 0));
 
-    $('count').textContent = `${cards.length}개`;
+    $('count').textContent = `${alive.length}개`;
     const due = dueCards().length;
     $('dueCount').textContent = due ? String(due) : '';
     const chip = $('todayChip');
-    chip.className = 'today-chip' + (cards.length && !due ? ' clear' : '');
-    chip.textContent = !cards.length ? '' : due ? `🔥 오늘 복습 ${due}장 남았어요` : '🎉 오늘 복습 끝!';
+    chip.className = 'today-chip' + (alive.length && !due ? ' clear' : '');
+    chip.textContent = !alive.length ? '' : due ? `🔥 오늘 복습 ${due}장 남았어요` : '🎉 오늘 복습 끝!';
 
     if (!shown.length) {
-      let msg = '아직 표현이 없어요.\n아래 ＋ 붙여넣기로 첫 카드를 만들어 봐요!';
-      if (cards.length) msg = '찾는 표현이 없어요.';
+      let msg = '아직 표현이 없어요.\n아래 ＋ 넣기로 첫 카드를 만들어 봐요!';
+      if (alive.length) msg = '찾는 표현이 없어요.';
       else if (CLOUD && !session) msg = '반가워요! 위의 🔒 로그인 · 회원가입을 눌러 주세요.\n처음이면 초대 코드로 가입할 수 있어요.';
       const box = el('div', 'empty');
       box.append(mascot(), el('p', '', msg));
@@ -469,7 +483,7 @@
       const meta = el('div', 'meta');
       if (c.source) meta.append(el('span', '', `${SOURCE_EMOJI[c.source] || '📌'} ${c.source}`));
       meta.append(el('span', '', c.created.slice(5).replace('-', '/')));
-      if (c.used) meta.append(el('span', 'used', '✅ 써먹음'));
+      if (c.note) meta.append(el('span', 'used', '📝 비교·메모'));
       item.append(meta);
       item.addEventListener('click', () => openCard(c.id));
       list.append(item);
@@ -483,8 +497,16 @@
     for (const [k, label] of FIELDS) {
       if (keys && !keys.includes(k)) continue;
       if (!c[k]) continue;
-      const f = el('div', 'field');
-      f.append(el('div', 'field-k', label), el('div', 'field-v', c[k]));
+      const f = el('div', 'field' + (k === 'note' ? ' field-note' : ''));
+      f.append(el('div', 'field-k', k === 'note' ? '📝 비교·메모' : label));
+      const lines = c[k].split('\n').map((s) => s.trim()).filter(Boolean);
+      if (k === 'example' && lines.length > 1) {
+        const ul = el('ul', 'ex-list');
+        for (const l of lines) ul.append(el('li', '', l.replace(/^[-•*]\s*|^\d+[.)]\s*/, '')));
+        f.append(ul);
+      } else {
+        f.append(el('div', 'field-v', c[k]));
+      }
       box.append(f);
     }
     return box;
@@ -493,29 +515,160 @@
     const c = cards.find((x) => x.id === id);
     if (!c) return;
     openId = id;
-    $('cardTitle').textContent = c.expr;
-    $('cardBody').replaceChildren(fieldsView(c));
-    $('btnUsed').textContent = c.used ? '✅ 써먹었어요' : '써먹었어요 표시';
+    showCardView(c);
     $('dlgCard').showModal();
   }
-  $('btnUsed').addEventListener('click', () => {
-    const c = cards.find((x) => x.id === openId);
-    if (!c) return;
-    c.used = !c.used;
+  function showCardView(c) {
+    $('cardTitle').textContent = c.expr;
+    const body = el('div', 'fields');
+    if (c.type) { const b = el('div'); b.append(badge(c.type)); body.append(b); }
+    body.append(fieldsView(c, FIELDS.map(([k]) => k).filter((k) => k !== 'type')));
+    $('cardBody').replaceChildren(body);
+    $('cardActions').hidden = false;
+    $('editActions').hidden = true;
+  }
+  function touch(c) {
     saveLocal();
     queue({ op: 'upsert', card: c });
-    $('btnUsed').textContent = c.used ? '✅ 써먹었어요' : '써먹었어요 표시';
     renderList();
+  }
+  // ----- 수정 -----
+  const EDIT_FIELDS = [['expr', '표현', 'input'], ...FIELDS.map(([k, l]) => [k, l, k === 'type' ? 'select' : (['sentence', 'meaning', 'example', 'mine', 'note'].includes(k) ? 'textarea' : 'input')])];
+  const EDIT_HINT = { example: '여러 개면 한 줄에 하나씩', note: '예) why는 이유·목적을 물을 때, what은 상대의 이상한 행동에 "뭐야?" 할 때' };
+  $('btnEdit').addEventListener('click', () => {
+    const c = cards.find((x) => x.id === openId);
+    if (!c) return;
+    $('cardTitle').textContent = '✏️ 카드 수정';
+    const form = el('div', 'edit-form');
+    for (const [k, label, kind] of EDIT_FIELDS) {
+      const wrap = el('label', 'edit-field');
+      wrap.append(el('span', 'field-k', label));
+      let input;
+      if (kind === 'select') {
+        input = el('select', 'search');
+        for (const t of ['', ...TYPES]) {
+          const o = el('option', '', t || '(선택 안 함)');
+          o.value = t;
+          input.append(o);
+        }
+      } else {
+        input = el(kind, 'search');
+        if (kind === 'textarea') input.rows = k === 'note' || k === 'example' ? 3 : 2;
+        if (EDIT_HINT[k]) input.placeholder = EDIT_HINT[k];
+      }
+      input.id = `edit_${k}`;
+      input.value = c[k] || '';
+      if (k === 'expr') input.required = true;
+      wrap.append(input);
+      form.append(wrap);
+    }
+    $('cardBody').replaceChildren(form);
+    $('cardActions').hidden = true;
+    $('editActions').hidden = false;
+    $('edit_expr').focus();
   });
+  $('btnEditCancel').addEventListener('click', () => {
+    const c = cards.find((x) => x.id === openId);
+    if (c) showCardView(c);
+  });
+  $('btnEditSave').addEventListener('click', () => {
+    const c = cards.find((x) => x.id === openId);
+    if (!c) return;
+    const expr = clean($('edit_expr').value);
+    if (!expr) { alert('표현은 비워 둘 수 없어요.'); return; }
+    const clash = live().find((x) => x.id !== c.id && norm(x.expr) === norm(expr));
+    if (clash && !confirm(`"${clash.expr}" 카드가 이미 있어요. 그래도 저장할까요?`)) return;
+    c.expr = expr;
+    for (const [k] of FIELDS) c[k] = clean($(`edit_${k}`).value);
+    touch(c);
+    showCardView(c);
+  });
+
+  // ----- 휴지통 -----
   $('btnDelete').addEventListener('click', () => {
     const c = cards.find((x) => x.id === openId);
-    if (!c || !confirm(`"${c.expr}" 카드를 삭제할까요?`)) return;
-    cards = cards.filter((x) => x.id !== openId);
-    saveLocal();
-    queue({ op: 'delete', id: openId });
+    if (!c) return;
+    c.deleted = new Date().toISOString();
+    touch(c);
     $('dlgCard').close();
-    renderList();
+    toast(`🗑️ "${c.expr}"을(를) 휴지통에 넣었어요`, '되돌리기', () => { c.deleted = ''; touch(c); });
   });
+
+  function purgeOldTrash() {
+    const limit = Date.now() - TRASH_DAYS * 86400000;
+    const old = trashed().filter((c) => Date.parse(c.deleted) < limit);
+    if (!old.length) return;
+    const ids = new Set(old.map((c) => c.id));
+    cards = cards.filter((c) => !ids.has(c.id));
+    saveLocal();
+    for (const id of ids) queue({ op: 'delete', id });
+  }
+  function renderTrash() {
+    const list = $('trashList');
+    list.replaceChildren();
+    const items = trashed().sort((a, b) => (a.deleted < b.deleted ? 1 : -1));
+    $('btnEmptyTrash').hidden = !items.length;
+    if (!items.length) {
+      const box = el('div', 'empty');
+      box.append(mascot(), el('p', '', '휴지통이 비어 있어요.'));
+      list.append(box);
+      return;
+    }
+    for (const c of items) {
+      const row = el('div', 'trash-item');
+      const info = el('div', 'trash-info');
+      const left = Math.max(0, TRASH_DAYS - Math.floor((Date.now() - Date.parse(c.deleted)) / 86400000));
+      info.append(el('b', '', c.expr), el('span', 'meta-line', `${(c.meaning || c.natural || '').split('\n')[0]} · ${left}일 뒤 자동 삭제`));
+      const restore = el('button', 'mini good', '복구');
+      restore.type = 'button';
+      restore.addEventListener('click', () => { c.deleted = ''; touch(c); renderTrash(); renderTrashCount(); });
+      const kill = el('button', 'mini bad', '영구 삭제');
+      kill.type = 'button';
+      kill.addEventListener('click', () => {
+        if (!confirm(`"${c.expr}"을(를) 영구 삭제할까요? 되돌릴 수 없어요.`)) return;
+        cards = cards.filter((x) => x.id !== c.id);
+        saveLocal();
+        queue({ op: 'delete', id: c.id });
+        renderTrash(); renderTrashCount();
+      });
+      row.append(info, restore, kill);
+      list.append(row);
+    }
+  }
+  function renderTrashCount() {
+    const n = trashed().length;
+    $('btnTrash').textContent = n ? `🗑️ 휴지통 (${n})` : '🗑️ 휴지통';
+  }
+  $('btnTrash').addEventListener('click', () => {
+    $('dlgMore').close();
+    renderTrash();
+    $('dlgTrash').showModal();
+  });
+  $('btnEmptyTrash').addEventListener('click', () => {
+    const items = trashed();
+    if (!items.length || !confirm(`휴지통의 ${items.length}개를 모두 영구 삭제할까요? 되돌릴 수 없어요.`)) return;
+    const ids = new Set(items.map((c) => c.id));
+    cards = cards.filter((c) => !ids.has(c.id));
+    saveLocal();
+    for (const id of ids) queue({ op: 'delete', id });
+    renderTrash(); renderTrashCount();
+  });
+
+  // 아래에 잠깐 뜨는 알림 (되돌리기 버튼 포함)
+  let toastTimer = null;
+  function toast(msg, actionLabel, action) {
+    const t = $('toast');
+    t.replaceChildren(el('span', '', msg));
+    if (actionLabel) {
+      const b = el('button', 'toast-btn', actionLabel);
+      b.type = 'button';
+      b.addEventListener('click', () => { action(); t.hidden = true; });
+      t.append(b);
+    }
+    t.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { t.hidden = true; }, 5000);
+  }
 
   // ---------- 붙여넣기 ----------
   let parsed = [];
@@ -534,9 +687,11 @@
       pv.append(el('p', 'note', '카드로 만들 표현을 찾지 못했어요. 긴 글이나 메모는 📥 메모로 보관해 두면 Claude 선생님이 정리해 줘요.'));
       return;
     }
-    const byExpr = new Map(cards.map((c) => [norm(c.expr), c]));
+    // 살아 있는 카드를 먼저, 휴지통 카드는 그다음으로 찾는다 (휴지통에 있으면 꺼내서 채움)
+    const byExpr = new Map(trashed().concat(live()).map((c) => [norm(c.expr), c]));
     const added = [];
     const filled = [];
+    let restored = 0;
     for (const c of parsed) {
       const old = byExpr.get(norm(c.expr));
       if (!old) {
@@ -546,7 +701,17 @@
         continue;
       }
       let changed = false;
-      for (const [k] of FIELDS) if (!old[k] && c[k]) { old[k] = c[k]; changed = true; }
+      if (old.deleted) { old.deleted = ''; changed = true; restored++; }
+      for (const [k] of FIELDS) {
+        if (!c[k]) continue;
+        if (!old[k]) { old[k] = c[k]; changed = true; continue; }
+        // 예문·비교 메모는 새 줄만 덧붙인다
+        if (k === 'example' || k === 'note') {
+          const have = new Set(old[k].split('\n').map((s) => norm(s)));
+          const extra = c[k].split('\n').filter((s) => s.trim() && !have.has(norm(s)));
+          if (extra.length) { old[k] = clean(old[k] + '\n' + extra.join('\n')); changed = true; }
+        }
+      }
       if (changed) { filled.push(old); queue({ op: 'upsert', card: old }); }
     }
     cards = cards.concat(added);
@@ -555,7 +720,8 @@
     renderList();
 
     const head = [`✅ ${added.length}개 저장`];
-    if (filled.length) head.push(`${filled.length}개는 이미 있어서 빈 칸만 채웠어요`);
+    if (filled.length) head.push(`${filled.length}개는 이미 있어서 내용만 보탰어요`);
+    if (restored) head.push(`그중 ${restored}개는 휴지통에서 꺼냈어요`);
     const skipped = parsed.length - added.length - filled.length;
     if (skipped > 0) head.push(`${skipped}개는 이미 있어요`);
     pv.append(el('p', 'note ok', head.join(' · ')));
@@ -570,22 +736,10 @@
     $('pasteBox').value = '';
   }
 
-  $('btnPasteClip').addEventListener('click', async () => {
-    let text = '';
-    try {
-      text = await navigator.clipboard.readText();
-    } catch (e) {
-      $('preview').replaceChildren(el('p', 'note', '복사한 내용을 읽지 못했어요. 아래 칸을 길게 눌러 붙여넣고 "카드로 저장"을 눌러 주세요.'));
-      $('pasteBox').focus();
-      return;
-    }
-    if (!clean(text)) { $('preview').replaceChildren(el('p', 'note', '복사된 내용이 없어요. ChatGPT 결과를 먼저 복사해 주세요.')); return; }
-    saveFromText(text);
-  });
   $('btnParse').addEventListener('click', () => saveFromText($('pasteBox').value));
 
   // ---------- 복습 ----------
-  function dueCards() { const t = today(); return cards.filter((c) => c.due <= t); }
+  function dueCards() { const t = today(); return live().filter((c) => c.due <= t); }
   let rq = [];
   let qi = 0;
   $('btnReview').addEventListener('click', () => {
@@ -688,8 +842,8 @@
 
   function pickTargets() {
     const n = KIND_INFO[diaryKind].n;
-    const pool = cards.filter((c) => !c.used);
-    const src = (pool.length >= n ? pool : cards).slice().sort(() => Math.random() - 0.5);
+    const alive = live();
+    const src = alive.slice().sort(() => Math.random() - 0.5);
     targets = src.slice(0, n).map((c) => c.expr);
     const box = $('targetChips');
     box.replaceChildren();
@@ -831,7 +985,7 @@
         view.append(section('💡 이렇게도 말해요', ul));
       }
       const used = arr(fb.used).map(str).filter(Boolean);
-      if (used.length) view.append(section('✅ 잘 써먹은 표현', el('p', 'fb-text', used.join(', '))));
+      if (used.length) view.append(section('✅ 잘 쓴 표현', el('p', 'fb-text', used.join(', '))));
       const made = arr(fb.cards).map(str).filter(Boolean);
       if (made.length) view.append(section('🗂️ 새로 만든 카드', el('p', 'fb-text', made.join(', '))));
       if (str(fb.praise)) {
@@ -858,6 +1012,7 @@
     $('moreMsg').textContent = '';
     $('accountInfo').textContent = !CLOUD ? '클라우드 미설정 · 이 기기에만 저장 중' : session ? `로그인: ${session.email}` : '로그인 안 됨';
     $('btnLogout').hidden = !(CLOUD && session);
+    renderTrashCount();
     $('dlgMore').showModal();
   });
   $('btnExport').addEventListener('click', () => {
@@ -879,7 +1034,7 @@
       if (!data || data.app !== 'en-notebook' || !Array.isArray(data.cards)) throw new Error('format');
       const incoming = data.cards.map(sanitizeCard).filter(Boolean).slice(0, MAX_CARDS);
       const have = new Set(cards.map((c) => norm(c.expr)));
-      const add = incoming.filter((c) => !have.has(norm(c.expr)));
+      const add = incoming.filter((c) => !have.has(norm(c.expr))).map((c) => Object.assign(c, { deleted: '' }));
       cards = cards.concat(add);
       saveLocal();
       for (const c of add) queue({ op: 'upsert', card: c });
@@ -893,13 +1048,20 @@
   // ---------- 공통 ----------
   document.querySelectorAll('[data-close]').forEach((b) =>
     b.addEventListener('click', () => b.closest('dialog').close()));
+  // 팝업 바깥(어두운 배경)을 눌렀을 때만 닫는다. 팝업 안의 빈 여백을 눌러도 닫히지 않게.
   document.querySelectorAll('dialog').forEach((d) =>
-    d.addEventListener('click', (e) => { if (e.target === d) d.close(); }));
+    d.addEventListener('click', (e) => {
+      if (e.target !== d) return;
+      const r = d.getBoundingClientRect();
+      const inside = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+      if (!inside) d.close();
+    }));
   $('search').addEventListener('input', (e) => { query = e.target.value; renderList(); });
   window.addEventListener('online', scheduleSync);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') scheduleSync(); });
 
   $('headMascot').append(mascot());
+  purgeOldTrash();
   renderTabs();
   renderList();
   sync();

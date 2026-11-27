@@ -307,6 +307,35 @@ textarea:focus { border-color: var(--primary); }
 .teacher-say { margin: 0; background: var(--idiom-bg); color: var(--text); border-radius: 18px 18px 18px 4px; padding: 10px 14px; font-weight: 700; }
 .note.wait { text-align: center; font-weight: 700; }
 
+.ex-list { margin: 2px 0 0; padding-left: 18px; display: grid; gap: 4px; }
+.field-note { background: var(--idiom-bg); box-shadow: none; }
+.field-note .field-k { color: var(--idiom); }
+
+/* ---------- 카드 수정 · 휴지통 · 알림 ---------- */
+.card-body { max-height: 58vh; overflow-y: auto; }
+.icon-btn { flex: 0 0 56px !important; }
+.edit-form { display: grid; gap: 10px; }
+.edit-field { display: grid; gap: 4px; }
+.edit-field .search { padding: 10px 12px; font-size: 15px; }
+.edit-field textarea.search { resize: vertical; }
+select.search { appearance: none; -webkit-appearance: none; }
+.trash-list { display: grid; gap: 8px; max-height: 55vh; overflow-y: auto; }
+.trash-item { display: flex; gap: 6px; align-items: center; background: var(--card); border-radius: 16px; padding: 10px 12px; box-shadow: var(--shadow); }
+.trash-info { flex: 1; min-width: 0; display: grid; }
+.trash-info b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.meta-line { font-size: 12px; color: var(--sub); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mini.good { background: var(--phr-bg); color: var(--phr); }
+.mini.bad { background: var(--slang-bg); color: var(--bad-dark); }
+.mini { flex: none; }
+.toast {
+  position: fixed; left: 16px; right: 16px; bottom: calc(92px + env(safe-area-inset-bottom)); z-index: 10;
+  max-width: 560px; margin: 0 auto;
+  display: flex; gap: 10px; align-items: center; justify-content: space-between;
+  background: var(--text); color: var(--bg); border-radius: 16px; padding: 12px 14px; font-weight: 700; font-size: 14px;
+  box-shadow: 0 6px 20px rgba(0,0,0,.2);
+}
+.toast-btn { border: 0; background: var(--sun); color: #4a3700; border-radius: 999px; padding: 5px 12px; font-weight: 800; flex: none; }
+
 [hidden] { display: none !important; }
 
 /* 아이패드·PC: 가운데 정렬 + 카드 2열 */

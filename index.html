@@ -63,8 +63,7 @@
 <dialog id="dlgAdd" class="sheet">
   <div class="sheet-head"><h2>표현 넣기</h2><button class="x" data-close type="button" aria-label="닫기">✕</button></div>
   <p class="note">ChatGPT "영어 표현장" 프로젝트에서 받은 결과를 그대로 붙여 넣으면 카드로 저장돼요. 칸이 몇 개 빠져 있어도, "단어 - 뜻" 목록이어도 괜찮아요.</p>
-  <button id="btnPasteClip" class="btn primary" type="button">📋 복사한 것 붙여넣고 바로 저장</button>
-  <textarea id="pasteBox" class="mt" rows="7" placeholder="또는 여기에 길게 눌러 붙여넣기&#10;&#10;표현: fall through&#10;뜻·뉘앙스: 무산되다&#10;---&#10;ngl - 솔직히 말하면"></textarea>
+  <textarea id="pasteBox" rows="8" placeholder="여기를 길게 눌러 붙여넣기&#10;&#10;표현: fall through&#10;뜻·뉘앙스: 무산되다&#10;---&#10;ngl - 솔직히 말하면"></textarea>
   <div class="row">
     <button id="btnParse" class="btn primary" type="button">카드로 저장</button>
     <button id="btnInbox" class="btn" type="button">📥 메모로 보관</button>
@@ -75,12 +74,26 @@
 <!-- 카드 상세 -->
 <dialog id="dlgCard" class="sheet">
   <div class="sheet-head"><h2 id="cardTitle"></h2><button class="x" data-close type="button" aria-label="닫기">✕</button></div>
-  <div id="cardBody"></div>
-  <div class="row">
-    <button id="btnUsed" class="btn" type="button"></button>
-    <button id="btnDelete" class="btn danger" type="button">삭제</button>
+  <div id="cardBody" class="card-body"></div>
+  <div id="cardActions" class="row">
+    <button id="btnEdit" class="btn" type="button">✏️ 수정</button>
+    <button id="btnDelete" class="btn danger icon-btn" type="button" aria-label="휴지통으로">🗑️</button>
+  </div>
+  <div id="editActions" class="row" hidden>
+    <button id="btnEditCancel" class="btn" type="button">취소</button>
+    <button id="btnEditSave" class="btn primary" type="button">저장</button>
   </div>
 </dialog>
+
+<!-- 휴지통 -->
+<dialog id="dlgTrash" class="sheet">
+  <div class="sheet-head"><h2>🗑️ 휴지통</h2><button class="x" data-close type="button" aria-label="닫기">✕</button></div>
+  <p class="note">지운 카드는 30일 동안 여기 있다가 자동으로 사라져요. 복구하면 원래 자리로 돌아가요.</p>
+  <div id="trashList" class="trash-list"></div>
+  <button id="btnEmptyTrash" class="btn danger mt" type="button" hidden>휴지통 비우기</button>
+</dialog>
+
+<div id="toast" class="toast" role="status" hidden></div>
 
 <!-- 복습 -->
 <dialog id="dlgReview" class="sheet full">
@@ -124,6 +137,7 @@
   <div class="sheet-head"><h2>계정 · 백업</h2><button class="x" data-close type="button" aria-label="닫기">✕</button></div>
   <p id="accountInfo" class="note"></p>
   <div class="col">
+    <button id="btnTrash" class="btn" type="button">🗑️ 휴지통</button>
     <button id="btnExport" class="btn" type="button">백업 파일 저장</button>
     <label class="btn file">백업 파일 불러오기<input id="fileImport" type="file" accept="application/json,.json"></label>
     <button id="btnLogout" class="btn danger" type="button" hidden>로그아웃 (이 기기 사본 지우기)</button>
