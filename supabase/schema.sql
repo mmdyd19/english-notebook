@@ -23,6 +23,10 @@ create table if not exists public.cards (
 
 create index if not exists cards_user_idx on public.cards (user_id);
 
+-- 추가 칸: 휴지통(지운 시각), 비교·메모
+alter table public.cards add column if not exists deleted_at timestamptz;
+alter table public.cards add column if not exists note text check (char_length(note) <= 2000);
+
 alter table public.cards enable row level security;
 
 drop policy if exists "own rows select" on public.cards;
