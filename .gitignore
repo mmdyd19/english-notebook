@@ -1,0 +1,14 @@
+# 학습 데이터·백업·캡처는 절대 저장소에 올리지 않는다 (공개 저장소)
+*백업*.json
+*backup*.json
+data/
+captures/
+*.png
+!icons/*.png
+*.jpg
+*.jpeg
+*.heic
+.env
+.env.*
+.DS_Store
+Thumbs.db

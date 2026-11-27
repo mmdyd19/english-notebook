@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://ofceqwunrihwykzcyqsi.supabase.co; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#f2f5ff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#171a26" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="표현장">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="style.css">
+<title>내 영어 표현장</title>
+</head>
+<body>
+<!-- 마스코트 '말랑이' (말풍선 캐릭터) -->
+<template id="tplMascot">
+  <svg class="mascot" viewBox="0 0 120 110" aria-hidden="true">
+    <path class="m-body" d="M60 8c28 0 50 18 50 41s-22 41-50 41c-6 0-12-1-17-3L20 100l6-20C15 72 10 61 10 49 10 26 32 8 60 8z"/>
+    <ellipse class="m-eye" cx="44" cy="47" rx="5.5" ry="7"/>
+    <ellipse class="m-eye" cx="76" cy="47" rx="5.5" ry="7"/>
+    <circle class="m-shine" cx="46" cy="44" r="2"/>
+    <circle class="m-shine" cx="78" cy="44" r="2"/>
+    <ellipse class="m-blush" cx="33" cy="60" rx="7" ry="4.5"/>
+    <ellipse class="m-blush" cx="87" cy="60" rx="7" ry="4.5"/>
+    <path class="m-mouth" d="M53 60q7 8 14 0"/>
+  </svg>
+</template>
+
+<header class="top">
+  <div class="top-row">
+    <div class="hello">
+      <span id="headMascot" class="head-mascot"></span>
+      <div>
+        <p class="greet">오늘도 한 표현씩!</p>
+        <h1>내 영어 표현장</h1>
+      </div>
+    </div>
+    <span id="count" class="count"></span>
+  </div>
+  <div class="chips">
+    <span id="todayChip" class="today-chip"></span>
+    <button id="syncStatus" class="sync" type="button"></button>
+  </div>
+  <input id="search" class="search" type="search" placeholder="검색 (영어·한글)" autocomplete="off">
+  <nav id="tabs" class="tabs" aria-label="유형"></nav>
+</header>
+
+<main id="list" class="list" aria-live="polite"></main>
+
+<footer class="bar">
+  <button id="btnAdd" class="bar-btn primary" type="button">＋ 붙여넣기</button>
+  <button id="btnReview" class="bar-btn review" type="button">복습하기 <span id="dueCount" class="due-dot"></span></button>
+  <button id="btnMore" class="bar-btn icon" type="button" aria-label="더보기">⋯</button>
+</footer>
+
+<!-- 붙여넣기 -->
+<dialog id="dlgAdd" class="sheet">
+  <div class="sheet-head"><h2>ChatGPT 결과 붙여넣기</h2><button class="x" data-close type="button" aria-label="닫기">✕</button></div>
+  <textarea id="pasteBox" rows="10" placeholder="표현: fall through&#10;유형: 구동사&#10;...&#10;---"></textarea>
+  <div class="row">
+    <button id="btnPasteClip" class="btn" type="button">클립보드에서 가져오기</button>
+    <button id="btnParse" class="btn primary" type="button">카드 만들기</button>
+  </div>
+  <div id="preview"></div>
+</dialog>
+
+<!-- 카드 상세 -->
+<dialog id="dlgCard" class="sheet">
+  <div class="sheet-head"><h2 id="cardTitle"></h2><button class="x" data-close type="button" aria-label="닫기">✕</button></div>
+  <div id="cardBody"></div>
+  <div class="row">
+    <button id="btnUsed" class="btn" type="button"></button>
+    <button id="btnDelete" class="btn danger" type="button">삭제</button>
+  </div>
+</dialog>
+
+<!-- 복습 -->
+<dialog id="dlgReview" class="sheet full">
+  <div class="sheet-head"><h2>복습 <span id="revProgress" class="rev-count"></span></h2><button class="x" data-close type="button" aria-label="닫기">✕</button></div>
+  <div class="progress" aria-hidden="true"><span id="revBar"></span></div>
+  <div id="revCard" class="rev-card"></div>
+  <div id="revActions" class="row"></div>
+</dialog>
+
+<!-- 더보기 -->
+<dialog id="dlgMore" class="sheet">
+  <div class="sheet-head"><h2>계정 · 백업</h2><button class="x" data-close type="button" aria-label="닫기">✕</button></div>
+  <p id="accountInfo" class="note"></p>
+  <div class="col">
+    <button id="btnExport" class="btn" type="button">백업 파일 저장</button>
+    <label class="btn file">백업 파일 불러오기<input id="fileImport" type="file" accept="application/json,.json"></label>
+    <button id="btnLogout" class="btn danger" type="button" hidden>로그아웃 (이 기기 사본 지우기)</button>
+  </div>
+  <p id="moreMsg" class="note"></p>
+</dialog>
+
+<!-- 로그인 -->
+<dialog id="dlgLogin" class="sheet">
+  <div class="sheet-head"><h2>로그인</h2><button class="x" data-close type="button" aria-label="닫기">✕</button></div>
+  <p class="note">로그인하면 폰·패드·PC 어디서든 같은 표현장을 봐요. 한 번 로그인하면 계속 유지돼요.</p>
+  <div class="col">
+    <input id="loginEmail" class="search" type="email" inputmode="email" autocomplete="username" placeholder="이메일 주소">
+    <input id="loginPw" class="search" type="password" autocomplete="current-password" placeholder="비밀번호">
+    <button id="btnLogin" class="btn primary" type="button">로그인</button>
+  </div>
+  <p id="loginMsg" class="note"></p>
+</dialog>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
