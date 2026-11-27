@@ -49,6 +49,30 @@ revoke all on public.cards from anon;
 revoke all on public.cards from authenticated;
 grant select, insert, update, delete on public.cards to authenticated;
 
+-- 기초 노트: 기본 노트는 앱 파일(grammar-base.js)에 있어 누구나 보고, 여기는 각자의 "내 노트"만
+create table if not exists public.grammar_notes (
+  id         uuid primary key,
+  user_id    uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  category   text not null check (char_length(category) between 1 and 40),
+  title      text not null check (char_length(title) between 1 and 200),
+  body       text check (char_length(body) <= 4000),
+  examples   text check (char_length(examples) <= 2000),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists grammar_notes_user_idx on public.grammar_notes (user_id);
+alter table public.grammar_notes enable row level security;
+drop policy if exists "own notes select" on public.grammar_notes;
+drop policy if exists "own notes insert" on public.grammar_notes;
+drop policy if exists "own notes update" on public.grammar_notes;
+drop policy if exists "own notes delete" on public.grammar_notes;
+create policy "own notes select" on public.grammar_notes for select to authenticated using ((select auth.uid()) = user_id);
+create policy "own notes insert" on public.grammar_notes for insert to authenticated with check ((select auth.uid()) = user_id);
+create policy "own notes update" on public.grammar_notes for update to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+create policy "own notes delete" on public.grammar_notes for delete to authenticated using ((select auth.uid()) = user_id);
+revoke all on public.grammar_notes from anon, authenticated;
+grant select, insert, update, delete on public.grammar_notes to authenticated;
+
 -- 받은함 · 영어 일기 · 작문 연습
 -- 앱 사용자는 쓰기·읽기·삭제만. 검사 결과(feedback, status)는 Claude 선생님(postgres 권한)만 쓴다.
 create table if not exists public.entries (
