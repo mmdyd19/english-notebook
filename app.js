@@ -290,7 +290,7 @@
     try {
       if (authMode === 'signup') {
         try {
-          await signupCall(email, pw, $('signupCode').value.trim().toUpperCase());
+          await signupCall(email, pw, $('signupCode').value.trim());
         } catch (e) {
           $('loginMsg').textContent = SIGNUP_ERR[e.code] || '가입하지 못했어요. 잠시 후 다시 시도해 주세요.';
           return;
