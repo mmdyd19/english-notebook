@@ -53,7 +53,8 @@ Deno.serve(async (req) => {
   if (password.length < 6 || password.length > 72) return json({ error: 'password' }, 400, origin);
 
   const invite = Deno.env.get('INVITE_CODE') ?? '';
-  if (!invite || !safeEqual(code, invite)) {
+  // 대소문자는 구분하지 않는다 (폰 자동 대문자 등으로 틀리지 않게)
+  if (!invite || !safeEqual(code.toLowerCase(), invite.toLowerCase())) {
     await sleep(800); // 코드 맞히기 시도를 느리게
     return json({ error: 'code' }, 403, origin);
   }
