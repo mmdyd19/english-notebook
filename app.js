@@ -333,8 +333,8 @@
     }
     session = null;
     // 자동 로그아웃(토큰 만료)일 때는 아직 못 보낸 변경을 지키기 위해 사본을 남긴다
-    const keys = silent ? [SESSION_KEY] : [SESSION_KEY, PENDING_KEY, STORE_KEY];
-    if (!silent) { pending = []; cards = []; }
+    const keys = silent ? [SESSION_KEY] : [SESSION_KEY, PENDING_KEY, STORE_KEY, 'en-notebook-notes'];
+    if (!silent) { pending = []; cards = []; myNotes = []; }
     for (const k of keys) try { localStorage.removeItem(k); } catch (e) { /* ignore */ }
     renderList();
     setStatus('login');
@@ -1004,6 +1004,159 @@
       loadEntries();
     } catch (e) {
       alert('삭제하지 못했어요. 인터넷 연결을 확인해 주세요.');
+    }
+  });
+
+  // ---------- 기초 노트 ----------
+  // 기본 노트(grammar-base.js)는 로그인 없이 누구나 본다. 내 노트는 grammar_notes 표(본인만).
+  const NOTES_KEY = 'en-notebook-notes';
+  const BASE_NOTES = (Array.isArray(window.GRAMMAR_BASE) ? window.GRAMMAR_BASE : [])
+    .map((n, i) => ({ id: `base-${i}`, base: true, category: String(n.cat || '기타'), title: String(n.title || ''), body: String(n.body || ''), examples: String(n.ex || '') }));
+  let myNotes = (readJSON(NOTES_KEY, []) || []).filter((n) => n && UUID_RE.test(n.id));
+  let gCat = '전체';
+  let gQuery = '';
+  let editingNoteId = null;
+
+  function allNotes() {
+    return myNotes.map((n) => Object.assign({ base: false }, n)).concat(BASE_NOTES);
+  }
+  function noteCats() {
+    const cats = [];
+    for (const n of BASE_NOTES.concat(myNotes)) if (!cats.includes(n.category)) cats.push(n.category);
+    return cats;
+  }
+  function renderGrammarCats() {
+    const nav = $('gCats');
+    nav.replaceChildren();
+    const opts = ['전체', ...(myNotes.length ? ['⭐ 내 노트'] : []), ...noteCats()];
+    if (!opts.includes(gCat)) gCat = '전체';
+    for (const c of opts) {
+      const b = el('button', 'tab', c);
+      b.type = 'button';
+      b.setAttribute('aria-pressed', String(c === gCat));
+      b.addEventListener('click', () => { gCat = c; renderGrammarCats(); renderGrammar(); });
+      nav.append(b);
+    }
+    const dl = $('nCatList');
+    dl.replaceChildren();
+    for (const c of noteCats()) { const o = el('option'); o.value = c; dl.append(o); }
+  }
+  function renderGrammar() {
+    const list = $('gList');
+    list.replaceChildren();
+    const q = norm(gQuery);
+    const items = allNotes()
+      .filter((n) => gCat === '전체' || (gCat === '⭐ 내 노트' ? !n.base : n.category === gCat))
+      .filter((n) => !q || norm([n.category, n.title, n.body, n.examples].join(' ')).includes(q));
+    if (!items.length) {
+      const box = el('div', 'empty');
+      box.append(mascot(), el('p', '', q ? '찾는 노트가 없어요.' : '아직 노트가 없어요.'));
+      list.append(box);
+      return;
+    }
+    let lastCat = null;
+    for (const n of items) {
+      if (gCat === '전체' && n.category !== lastCat) {
+        list.append(el('h3', 'g-cat', n.category));
+        lastCat = n.category;
+      }
+      const card = el('article', 'g-note' + (n.base ? '' : ' mine'));
+      const head = el('div', 'g-head');
+      head.append(el('h4', 'g-title', n.title));
+      head.append(el('span', 'g-tag', n.base ? '기본' : '⭐ 내 노트'));
+      card.append(head);
+      if (n.body) card.append(el('p', 'g-body', n.body));
+      const exs = String(n.examples || '').split('\n').map((s) => s.trim()).filter(Boolean);
+      if (exs.length) {
+        const ul = el('ul', 'g-ex');
+        for (const e of exs) ul.append(el('li', '', e));
+        card.append(ul);
+      }
+      if (!n.base) {
+        const edit = el('button', 'mini', '✏️ 수정');
+        edit.type = 'button';
+        edit.addEventListener('click', () => openNoteEditor(n));
+        card.append(edit);
+      }
+      list.append(card);
+    }
+  }
+  async function loadMyNotes() {
+    if (!CLOUD || !session) return;
+    try {
+      const rows = await rest('GET', '?select=id,category,title,body,examples,updated_at&order=updated_at.desc&limit=500', null, null, 'grammar_notes');
+      if (Array.isArray(rows)) {
+        myNotes = rows.map((r) => ({ id: r.id, category: clean(r.category) || '기타', title: clean(r.title), body: clean(r.body || ''), examples: clean(r.examples || '') }));
+        writeJSON(NOTES_KEY, myNotes);
+        renderGrammarCats();
+        renderGrammar();
+      }
+    } catch (e) { /* 오프라인이면 저장된 사본으로 보여 준다 */ }
+  }
+  $('btnGrammar').addEventListener('click', () => {
+    gQuery = '';
+    $('gSearch').value = '';
+    renderGrammarCats();
+    renderGrammar();
+    $('dlgGrammar').showModal();
+    loadMyNotes();
+  });
+  $('gSearch').addEventListener('input', (e) => { gQuery = e.target.value; renderGrammar(); });
+
+  function openNoteEditor(n) {
+    editingNoteId = n ? n.id : null;
+    $('noteTitle').textContent = n ? '✏️ 내 노트 수정' : '＋ 내 노트 추가';
+    $('nCat').value = n ? n.category : (gCat !== '전체' && gCat !== '⭐ 내 노트' ? gCat : '');
+    $('nTitle').value = n ? n.title : '';
+    $('nBody').value = n ? n.body : '';
+    $('nEx').value = n ? n.examples : '';
+    $('btnNoteDelete').hidden = !n;
+    $('noteMsg').textContent = '';
+    $('dlgNote').showModal();
+  }
+  $('btnAddNote').addEventListener('click', () => {
+    if (!(CLOUD && session)) {
+      alert('내 노트는 로그인하면 추가할 수 있어요. 기본 노트는 로그인 없이 볼 수 있어요.');
+      return;
+    }
+    openNoteEditor(null);
+  });
+  $('btnNoteSave').addEventListener('click', async () => {
+    const row = {
+      id: editingNoteId || crypto.randomUUID(),
+      category: clean($('nCat').value).slice(0, 40) || '내 메모',
+      title: clean($('nTitle').value).slice(0, 200),
+      body: clean($('nBody').value).slice(0, 4000) || null,
+      examples: clean($('nEx').value) || null,
+      updated_at: new Date().toISOString(),
+    };
+    if (!row.title) { $('noteMsg').textContent = '제목을 적어 주세요.'; return; }
+    $('btnNoteSave').disabled = true;
+    try {
+      await rest('POST', '?on_conflict=id', [row], { Prefer: 'resolution=merge-duplicates,return=minimal' }, 'grammar_notes');
+      myNotes = [{ id: row.id, category: row.category, title: row.title, body: row.body || '', examples: row.examples || '' }]
+        .concat(myNotes.filter((n) => n.id !== row.id));
+      writeJSON(NOTES_KEY, myNotes);
+      $('dlgNote').close();
+      renderGrammarCats();
+      renderGrammar();
+    } catch (e) {
+      $('noteMsg').textContent = '저장하지 못했어요. 인터넷 연결을 확인해 주세요.';
+    } finally {
+      $('btnNoteSave').disabled = false;
+    }
+  });
+  $('btnNoteDelete').addEventListener('click', async () => {
+    if (!editingNoteId || !UUID_RE.test(editingNoteId) || !confirm('이 노트를 삭제할까요?')) return;
+    try {
+      await rest('DELETE', `?id=eq.${editingNoteId}`, null, null, 'grammar_notes');
+      myNotes = myNotes.filter((n) => n.id !== editingNoteId);
+      writeJSON(NOTES_KEY, myNotes);
+      $('dlgNote').close();
+      renderGrammarCats();
+      renderGrammar();
+    } catch (e) {
+      $('noteMsg').textContent = '삭제하지 못했어요. 인터넷 연결을 확인해 주세요.';
     }
   });
 

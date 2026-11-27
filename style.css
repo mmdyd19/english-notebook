@@ -336,6 +336,26 @@ select.search { appearance: none; -webkit-appearance: none; }
 }
 .toast-btn { border: 0; background: var(--sun); color: #4a3700; border-radius: 999px; padding: 5px 12px; font-weight: 800; flex: none; }
 
+/* ---------- 기초 노트 ---------- */
+.top-right { display: flex; gap: 6px; align-items: center; flex: none; }
+.grammar-btn {
+  border: 0; border-radius: 999px; padding: 4px 11px; font-size: 13px; font-weight: 800;
+  background: var(--phr-bg); color: var(--phr); box-shadow: var(--shadow);
+}
+#dlgGrammar .search { margin-bottom: 2px; }
+#dlgGrammar .tabs { padding-bottom: 10px; }
+.g-list { display: grid; gap: 10px; }
+.g-cat { margin: 10px 2px 0; font-size: 15px; font-weight: 800; color: var(--primary); }
+.g-note { background: var(--card); border: 2px solid var(--line); border-radius: 20px; padding: 14px 16px; display: grid; gap: 6px; box-shadow: 0 3px 0 var(--line); }
+.g-note.mine { border-color: var(--sun); box-shadow: 0 3px 0 var(--sun-dark); }
+.g-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.g-title { margin: 0; font-size: 16px; font-weight: 800; line-height: 1.4; }
+.g-tag { flex: none; font-size: 11px; font-weight: 800; border-radius: 999px; padding: 2px 8px; background: var(--chip); color: var(--sub); }
+.g-note.mine .g-tag { background: var(--idiom-bg); color: var(--idiom); }
+.g-body { margin: 0; white-space: pre-wrap; word-break: break-word; line-height: 1.7; font-size: 15px; }
+.g-ex { margin: 0; padding: 8px 10px 8px 26px; background: var(--word-bg); border-radius: 12px; display: grid; gap: 3px; font-size: 14px; }
+.g-note .mini { justify-self: start; }
+
 [hidden] { display: none !important; }
 
 /* 아이패드·PC: 가운데 정렬 + 카드 2열 */

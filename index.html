@@ -40,7 +40,10 @@
         <h1>내 영어 표현장</h1>
       </div>
     </div>
-    <span id="count" class="count"></span>
+    <div class="top-right">
+      <button id="btnGrammar" class="grammar-btn" type="button">📚 기초</button>
+      <span id="count" class="count"></span>
+    </div>
   </div>
   <div class="chips">
     <span id="todayChip" class="today-chip"></span>
@@ -83,6 +86,38 @@
     <button id="btnEditCancel" class="btn" type="button">취소</button>
     <button id="btnEditSave" class="btn primary" type="button">저장</button>
   </div>
+</dialog>
+
+<!-- 기초 노트 -->
+<dialog id="dlgGrammar" class="sheet full">
+  <div class="sheet-head"><h2>📚 영어 기초 노트</h2><button class="x" data-close type="button" aria-label="닫기">✕</button></div>
+  <input id="gSearch" class="search" type="search" placeholder="검색 (예: 동사원형, have got)" autocomplete="off">
+  <nav id="gCats" class="tabs" aria-label="분류"></nav>
+  <div class="diary-scroll">
+    <button id="btnAddNote" class="btn primary" type="button">＋ 내 노트 추가</button>
+    <div id="gList" class="g-list"></div>
+  </div>
+</dialog>
+
+<!-- 내 노트 쓰기 -->
+<dialog id="dlgNote" class="sheet">
+  <div class="sheet-head"><h2 id="noteTitle">내 노트</h2><button class="x" data-close type="button" aria-label="닫기">✕</button></div>
+  <div class="edit-form">
+    <label class="edit-field"><span class="field-k">분류</span>
+      <input id="nCat" class="search" list="nCatList" placeholder="예) 시제, 부정·의문, 내가 자주 틀리는 것"></label>
+    <datalist id="nCatList"></datalist>
+    <label class="edit-field"><span class="field-k">제목</span>
+      <input id="nTitle" class="search" placeholder="예) didn't 뒤에는 동사원형"></label>
+    <label class="edit-field"><span class="field-k">설명</span>
+      <textarea id="nBody" class="search" rows="4" placeholder="규칙이나 차이를 내 말로 적어요"></textarea></label>
+    <label class="edit-field"><span class="field-k">예문 (한 줄에 하나)</span>
+      <textarea id="nEx" class="search" rows="3" placeholder="I didn't go there."></textarea></label>
+  </div>
+  <div class="row">
+    <button id="btnNoteDelete" class="btn danger icon-btn" type="button" aria-label="삭제" hidden>🗑️</button>
+    <button id="btnNoteSave" class="btn primary" type="button">저장</button>
+  </div>
+  <p id="noteMsg" class="note"></p>
 </dialog>
 
 <!-- 휴지통 -->
@@ -164,6 +199,7 @@
 </dialog>
 
 <script src="config.js"></script>
+<script src="grammar-base.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
