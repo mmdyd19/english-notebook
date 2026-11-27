@@ -101,11 +101,17 @@
 
 <!-- 로그인 -->
 <dialog id="dlgLogin" class="sheet">
-  <div class="sheet-head"><h2>로그인</h2><button class="x" data-close type="button" aria-label="닫기">✕</button></div>
-  <p class="note">로그인하면 폰·패드·PC 어디서든 같은 표현장을 봐요. 한 번 로그인하면 계속 유지돼요.</p>
+  <div class="sheet-head"><h2 id="authTitle">로그인</h2><button class="x" data-close type="button" aria-label="닫기">✕</button></div>
+  <div class="seg" role="tablist">
+    <button id="tabLogin" class="seg-btn" type="button" role="tab" aria-selected="true">로그인</button>
+    <button id="tabSignup" class="seg-btn" type="button" role="tab" aria-selected="false">처음이에요 (회원가입)</button>
+  </div>
+  <p id="authNote" class="note">로그인하면 폰·패드·PC 어디서든 같은 표현장을 봐요. 한 번 로그인하면 계속 유지돼요.</p>
   <div class="col">
     <input id="loginEmail" class="search" type="email" inputmode="email" autocomplete="username" placeholder="이메일 주소">
     <input id="loginPw" class="search" type="password" autocomplete="current-password" placeholder="비밀번호">
+    <input id="signupPw2" class="search" type="password" autocomplete="new-password" placeholder="비밀번호 한 번 더" hidden>
+    <input id="signupCode" class="search" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="초대 코드 (예: MALANG-XXXX-XXXX)" hidden>
     <button id="btnLogin" class="btn primary" type="button">로그인</button>
   </div>
   <p id="loginMsg" class="note"></p>

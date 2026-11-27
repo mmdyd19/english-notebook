@@ -208,6 +208,9 @@ textarea {
   background: var(--card); padding: 12px; resize: vertical; outline: none;
 }
 textarea:focus { border-color: var(--primary); }
+.seg { display: flex; gap: 4px; background: var(--chip); border-radius: 16px; padding: 4px; margin-bottom: 10px; }
+.seg-btn { flex: 1; border: 0; background: none; border-radius: 12px; padding: 9px 6px; font-weight: 800; font-size: 14px; color: var(--sub); }
+.seg-btn[aria-selected="true"] { background: var(--card); color: var(--primary); box-shadow: var(--shadow); }
 .row { display: flex; gap: 10px; margin-top: 14px; }
 .row > * { flex: 1; }
 .col { display: grid; gap: 10px; }

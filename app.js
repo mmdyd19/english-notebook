@@ -211,7 +211,7 @@
   function setStatus(s) {
     const map = {
       local: '📱 이 기기에만 저장',
-      login: '🔒 로그인 필요',
+      login: '🔒 로그인 · 회원가입',
       syncing: '⏳ 동기화 중',
       ok: '☁️ 동기화됨',
       offline: '📴 오프라인 (나중에 동기화)',
@@ -228,18 +228,72 @@
   });
 
   // ---------- 로그인 (이메일 + 비밀번호, 새 가입은 서버에서 막아 둠) ----------
+  let authMode = 'login';
+  function setAuthMode(mode) {
+    authMode = mode;
+    const signup = mode === 'signup';
+    $('tabLogin').setAttribute('aria-selected', String(!signup));
+    $('tabSignup').setAttribute('aria-selected', String(signup));
+    $('authTitle').textContent = signup ? '회원가입' : '로그인';
+    $('authNote').textContent = signup
+      ? '초대 코드를 받은 사람만 가입할 수 있어요. 비밀번호는 6자 이상이에요.'
+      : '로그인하면 폰·패드·PC 어디서든 같은 표현장을 봐요. 한 번 로그인하면 계속 유지돼요.';
+    $('signupPw2').hidden = !signup;
+    $('signupCode').hidden = !signup;
+    $('loginPw').autocomplete = signup ? 'new-password' : 'current-password';
+    $('btnLogin').textContent = signup ? '가입하고 시작하기' : '로그인';
+    $('loginMsg').textContent = '';
+  }
+  $('tabLogin').addEventListener('click', () => setAuthMode('login'));
+  $('tabSignup').addEventListener('click', () => setAuthMode('signup'));
+
   function openLogin() {
     $('loginMsg').textContent = '';
     $('loginPw').value = '';
+    $('signupPw2').value = '';
+    setAuthMode(cards.length || localStorage.getItem('en-notebook-seen') ? 'login' : 'signup');
     $('dlgLogin').showModal();
   }
+
+  async function signupCall(email, password, code) {
+    const res = await fetch(`${API}/functions/v1/signup`, {
+      method: 'POST',
+      headers: { apikey: KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, code }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw Object.assign(new Error(data.error || 'server'), { code: data.error || 'server', status: res.status });
+  }
+  const SIGNUP_ERR = {
+    code: '초대 코드가 맞지 않아요.',
+    exists: '이미 가입된 이메일이에요. 로그인 탭에서 로그인해 주세요.',
+    email: '이메일 주소를 확인해 주세요.',
+    password: '비밀번호는 6자 이상이어야 해요.',
+  };
+
   $('btnLogin').addEventListener('click', async () => {
     const email = $('loginEmail').value.trim();
     const pw = $('loginPw').value;
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !pw) { $('loginMsg').textContent = '이메일과 비밀번호를 확인해 주세요.'; return; }
+    if (authMode === 'signup') {
+      if (pw.length < 6) { $('loginMsg').textContent = SIGNUP_ERR.password; return; }
+      if (pw !== $('signupPw2').value) { $('loginMsg').textContent = '비밀번호 두 개가 서로 달라요.'; return; }
+      if (!$('signupCode').value.trim()) { $('loginMsg').textContent = '초대 코드를 입력해 주세요.'; return; }
+    }
     $('btnLogin').disabled = true;
     try {
+      if (authMode === 'signup') {
+        try {
+          await signupCall(email, pw, $('signupCode').value.trim().toUpperCase());
+        } catch (e) {
+          $('loginMsg').textContent = SIGNUP_ERR[e.code] || '가입하지 못했어요. 잠시 후 다시 시도해 주세요.';
+          return;
+        }
+      }
       setSession(await authCall('token?grant_type=password', { email, password: pw }));
+      try { localStorage.setItem('en-notebook-seen', '1'); } catch (e) { /* ignore */ }
+      $('signupCode').value = '';
+      $('signupPw2').value = '';
       $('loginPw').value = '';
       // 로그인 전에 이 기기에 만들어 둔 카드는 서버로 올린다
       const server = await rest('GET', '?select=id,expr');
@@ -331,7 +385,7 @@
     if (!shown.length) {
       let msg = '아직 표현이 없어요.\n아래 ＋ 붙여넣기로 첫 카드를 만들어 봐요!';
       if (cards.length) msg = '찾는 표현이 없어요.';
-      else if (CLOUD && !session) msg = '위의 🔒 로그인 필요를 눌러 주세요.\n로그인하면 폰·패드·PC에서 같은 표현장을 봐요.';
+      else if (CLOUD && !session) msg = '반가워요! 위의 🔒 로그인 · 회원가입을 눌러 주세요.\n처음이면 초대 코드로 가입할 수 있어요.';
       const box = el('div', 'empty');
       box.append(mascot(), el('p', '', msg));
       list.append(box);
