@@ -336,8 +336,27 @@ select.search { appearance: none; -webkit-appearance: none; }
 }
 .toast-btn { border: 0; background: var(--sun); color: #4a3700; border-radius: 999px; padding: 5px 12px; font-weight: 800; flex: none; }
 
+/* ---------- 도움말 ---------- */
+.help-btn {
+  border: 0; width: 30px; height: 30px; border-radius: 50%; font-size: 14px;
+  background: var(--card); box-shadow: var(--shadow); flex: none;
+}
+.help-hero { display: flex; gap: 12px; align-items: center; background: var(--idiom-bg); border-radius: 20px; padding: 12px 14px; }
+.help-hero p { margin: 0; line-height: 1.6; }
+.help-mascot { width: 56px; flex: none; }
+.help-step { display: grid; gap: 8px; background: var(--card); border-radius: 20px; padding: 14px 16px; box-shadow: var(--shadow); }
+.help-step h3 { margin: 0; font-size: 16px; font-weight: 800; display: flex; gap: 8px; align-items: center; }
+.help-step p { margin: 0; line-height: 1.6; }
+.num { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--primary); color: var(--on-primary); font-size: 13px; flex: none; }
+.help-guide summary { cursor: pointer; font-weight: 700; color: var(--sub); font-size: 14px; }
+.help-guide textarea { margin-top: 8px; font-size: 12px; line-height: 1.5; }
+.help-list { margin: 0; padding-left: 18px; display: grid; gap: 6px; line-height: 1.6; }
+
 /* ---------- 기초 노트 ---------- */
 .top-right { display: flex; gap: 6px; align-items: center; flex: none; }
+h1 { white-space: nowrap; }
+.hello > div { min-width: 0; }
+@media (max-width: 360px) { h1 { font-size: 20px; } }
 .grammar-btn {
   border: 0; border-radius: 999px; padding: 4px 11px; font-size: 13px; font-weight: 800;
   background: var(--phr-bg); color: var(--phr); box-shadow: var(--shadow);
@@ -346,10 +365,29 @@ select.search { appearance: none; -webkit-appearance: none; }
 #dlgGrammar .tabs { padding-bottom: 10px; }
 .g-list { display: grid; gap: 10px; }
 .g-cat { margin: 10px 2px 0; font-size: 15px; font-weight: 800; color: var(--primary); }
-.g-note { background: var(--card); border: 2px solid var(--line); border-radius: 20px; padding: 14px 16px; display: grid; gap: 6px; box-shadow: 0 3px 0 var(--line); }
+.g-note { background: var(--card); border: 2px solid var(--line); border-radius: 20px; padding: 12px 16px; box-shadow: 0 3px 0 var(--line); }
+.g-note[open] { display: grid; gap: 8px; padding-bottom: 14px; }
 .g-note.mine { border-color: var(--sun); box-shadow: 0 3px 0 var(--sun-dark); }
-.g-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
-.g-title { margin: 0; font-size: 16px; font-weight: 800; line-height: 1.4; }
+.g-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; cursor: pointer; list-style: none; }
+.g-head::-webkit-details-marker { display: none; }
+.g-head::before { content: "▸"; color: var(--primary); font-weight: 800; flex: none; transition: transform .15s; }
+.g-note[open] > .g-head::before { transform: rotate(90deg); }
+.g-title { flex: 1; margin: 0; font-size: 16px; font-weight: 800; line-height: 1.4; }
+.g-crumb { align-self: center; font-weight: 800; color: var(--text); white-space: nowrap; }
+.g-crumb.muted { color: var(--sub); font-weight: 700; font-size: 13px; white-space: normal; }
+.g-toc { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.g-tile {
+  position: relative; display: grid; gap: 2px; align-content: start; text-align: left;
+  background: var(--card); border: 2px solid var(--line); border-radius: 20px; padding: 12px 12px 10px;
+  box-shadow: 0 3px 0 var(--line); min-width: 0;
+}
+.g-tile:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--line); }
+.g-tile.mine { border-color: var(--sun); box-shadow: 0 3px 0 var(--sun-dark); }
+.g-tile-emoji { font-size: 24px; line-height: 1.2; }
+.g-tile b { font-size: 15px; font-weight: 800; }
+.g-tile-desc { font-size: 12px; color: var(--sub); line-height: 1.4; }
+.g-tile-n { position: absolute; top: 10px; right: 10px; font-size: 11px; font-weight: 800; background: var(--word-bg); color: var(--primary); border-radius: 999px; padding: 1px 7px; }
+@media (min-width: 760px) { .g-toc { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .g-tag { flex: none; font-size: 11px; font-weight: 800; border-radius: 999px; padding: 2px 8px; background: var(--chip); color: var(--sub); }
 .g-note.mine .g-tag { background: var(--idiom-bg); color: var(--idiom); }
 .g-body { margin: 0; white-space: pre-wrap; word-break: break-word; line-height: 1.7; font-size: 15px; }

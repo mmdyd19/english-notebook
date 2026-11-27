@@ -1008,7 +1008,7 @@
   });
 
   // ---------- 기초 노트 ----------
-  // 기본 노트(grammar-base.js)는 로그인 없이 누구나 본다. 내 노트는 grammar_notes 표(본인만).
+  // 기본 노트(grammar/*.js)는 로그인 없이 누구나 본다. 내 노트는 grammar_notes 표(본인만).
   const NOTES_KEY = 'en-notebook-notes';
   const BASE_NOTES = (Array.isArray(window.GRAMMAR_BASE) ? window.GRAMMAR_BASE : [])
     .map((n, i) => ({ id: `base-${i}`, base: true, category: String(n.cat || '기타'), title: String(n.title || ''), body: String(n.body || ''), examples: String(n.ex || '') }));
@@ -1020,33 +1020,54 @@
   function allNotes() {
     return myNotes.map((n) => Object.assign({ base: false }, n)).concat(BASE_NOTES);
   }
+  const CAT_META = new Map((Array.isArray(window.GRAMMAR_CATS) ? window.GRAMMAR_CATS : []).map((c) => [c.name, c]));
   function noteCats() {
-    const cats = [];
+    const cats = [...CAT_META.keys()];
     for (const n of BASE_NOTES.concat(myNotes)) if (!cats.includes(n.category)) cats.push(n.category);
-    return cats;
+    return cats.filter((c) => BASE_NOTES.some((n) => n.category === c) || myNotes.some((n) => n.category === c));
   }
+  // 상단: 목차에서는 안내, 분류 안에서는 "← 목차" 버튼
   function renderGrammarCats() {
     const nav = $('gCats');
     nav.replaceChildren();
-    const opts = ['전체', ...(myNotes.length ? ['⭐ 내 노트'] : []), ...noteCats()];
-    if (!opts.includes(gCat)) gCat = '전체';
-    for (const c of opts) {
-      const b = el('button', 'tab', c);
-      b.type = 'button';
-      b.setAttribute('aria-pressed', String(c === gCat));
-      b.addEventListener('click', () => { gCat = c; renderGrammarCats(); renderGrammar(); });
-      nav.append(b);
+    if (gCat !== '전체') {
+      const back = el('button', 'tab', '← 목차');
+      back.type = 'button';
+      back.addEventListener('click', () => { gCat = '전체'; renderGrammarCats(); renderGrammar(); });
+      const meta = CAT_META.get(gCat);
+      nav.append(back, el('span', 'g-crumb', `${meta ? meta.emoji + ' ' : ''}${gCat}`));
+    } else {
+      nav.append(el('span', 'g-crumb muted', `기본 노트 ${BASE_NOTES.length}개 · 분류를 눌러 보거나 위에서 검색하세요`));
     }
     const dl = $('nCatList');
     dl.replaceChildren();
     for (const c of noteCats()) { const o = el('option'); o.value = c; dl.append(o); }
   }
+  function renderToc(list) {
+    const grid = el('div', 'g-toc');
+    const tile = (name, emoji, desc, count, mine) => {
+      const b = el('button', 'g-tile' + (mine ? ' mine' : ''));
+      b.type = 'button';
+      b.append(el('span', 'g-tile-emoji', emoji), el('b', '', name), el('span', 'g-tile-desc', desc), el('span', 'g-tile-n', `${count}`));
+      b.addEventListener('click', () => { gCat = name; renderGrammarCats(); renderGrammar(); $('gList').parentElement.scrollTop = 0; });
+      grid.append(b);
+    };
+    if (myNotes.length) tile('⭐ 내 노트', '⭐', '내가 추가한 노트', myNotes.length, true);
+    for (const c of noteCats()) {
+      const meta = CAT_META.get(c) || { emoji: '📝', desc: '내가 만든 분류' };
+      const count = BASE_NOTES.filter((n) => n.category === c).length + myNotes.filter((n) => n.category === c).length;
+      tile(c, meta.emoji, meta.desc, count, false);
+    }
+    list.append(grid);
+  }
   function renderGrammar() {
     const list = $('gList');
     list.replaceChildren();
     const q = norm(gQuery);
+    if (gCat === '전체' && !q) { renderToc(list); return; }
     const items = allNotes()
-      .filter((n) => gCat === '전체' || (gCat === '⭐ 내 노트' ? !n.base : n.category === gCat))
+      // 검색 중이면 분류와 상관없이 전체에서 찾는다
+      .filter((n) => q || gCat === '전체' || (gCat === '⭐ 내 노트' ? !n.base : n.category === gCat))
       .filter((n) => !q || norm([n.category, n.title, n.body, n.examples].join(' ')).includes(q));
     if (!items.length) {
       const box = el('div', 'empty');
@@ -1054,15 +1075,18 @@
       list.append(box);
       return;
     }
+    if (q) list.append(el('p', 'note', `"${gQuery.trim()}" 검색 결과 ${items.length}개`));
     let lastCat = null;
     for (const n of items) {
-      if (gCat === '전체' && n.category !== lastCat) {
+      if ((q || gCat === '⭐ 내 노트') && n.category !== lastCat) {
         list.append(el('h3', 'g-cat', n.category));
         lastCat = n.category;
       }
-      const card = el('article', 'g-note' + (n.base ? '' : ' mine'));
-      const head = el('div', 'g-head');
-      head.append(el('h4', 'g-title', n.title));
+      // 제목만 보이고 누르면 펼쳐지는 노트 (검색 중이면 펼친 상태)
+      const card = el('details', 'g-note' + (n.base ? '' : ' mine'));
+      if (q || items.length <= 3) card.open = true;
+      const head = el('summary', 'g-head');
+      head.append(el('span', 'g-title', n.title));
       head.append(el('span', 'g-tag', n.base ? '기본' : '⭐ 내 노트'));
       card.append(head);
       if (n.body) card.append(el('p', 'g-body', n.body));
@@ -1160,6 +1184,67 @@
     }
   });
 
+  // ---------- 도움말 (처음 온 사람에게 자동으로) ----------
+  const GPT_GUIDE = `너는 내 영어 표현장 정리 도우미야.
+내가 보내는 것: 캡처(외국인 채팅, 말해보카 오답, 영어 음성 대화), 문장, 단어, 메모.
+
+[할 일]
+1. 공부할 표현을 골라. 우선순위:
+   - 내가 틀리거나 어색하게 쓴 영어 (유형 "직역투 교정")
+   - 상대가 쓴 슬랭·줄임말·숙어·구동사
+   - 모르는 단어
+   I, good, thanks 같은 쉬운 단어는 빼.
+2. 결과는 반드시 코드블록 하나 안에, 아래 형식 그대로 써. 표현 사이는 --- 한 줄.
+   모든 칸을 빠짐없이 채워. 특히 "뜻·뉘앙스"와 "의역"은 반드시 한국어로.
+   원문 문장이 없으면 자연스러운 예시 문장을 만들어 넣어.
+
+표현:
+유형: 단어 / 숙어 / 구동사 / 슬랭·줄임말 / 직역투 교정 중 하나만
+출처: 채팅 / 말해보카 / 음성 / 읽기 중 하나만
+원문 문장:
+직역: (한국어, 단어 그대로 옮긴 뜻)
+의역: (한국어, 자연스러운 뜻)
+뜻·뉘앙스: (한국어 한 줄 + 비슷한 한국어 표현)
+격식도: 격식 / 일상 / 구어 / 슬랭 / 주의(비속어) 중 하나만
+내 원래 문장: (직역투 교정일 때만. 아니면 이 줄을 빼)
+예문:
+- (영어 일상 대화 예문 1)
+- (영어 일상 대화 예문 2)
+- (영어 일상 대화 예문 3)
+비교·메모: (헷갈리기 쉬운 비슷한 표현과의 차이를 한국어로. 예: why는 이유·목적을 물을 때, what은 상대의 이상한 행동에 의문을 표할 때. 비교할 게 없으면 이 줄을 빼)
+---
+
+3. 코드블록 밖에 "오늘의 한 줄": 다음 대화에서 써 볼 표현 1개와 상황.
+
+[규칙]
+- 라벨 이름(표현, 유형, 출처, 원문 문장, 직역, 의역, 뜻·뉘앙스, 격식도, 내 원래 문장, 예문, 비교·메모)은 절대 바꾸지 말고 한국어 그대로 써.
+- 캡처 속 사람 이름, 프로필, 연락처는 적지 마.
+- 글자가 안 보이면 추측하지 말고 "판독 불가".`;
+  const HELP_KEY = 'en-notebook-helped';
+  function openHelp() {
+    $('guideText').value = GPT_GUIDE;
+    $('copyMsg').hidden = true;
+    $('dlgHelp').showModal();
+    try { localStorage.setItem(HELP_KEY, '1'); } catch (e) { /* ignore */ }
+  }
+  $('btnHelp').addEventListener('click', openHelp);
+  $('btnCopyGuide').addEventListener('click', async () => {
+    const msg = $('copyMsg');
+    try {
+      await navigator.clipboard.writeText(GPT_GUIDE);
+      msg.textContent = '✅ 복사했어요! ChatGPT 프로젝트 지침 칸에 붙여 넣으세요.';
+    } catch (e) {
+      // 복사가 막힌 브라우저: 지침을 펼치고 전체 선택해 둔다
+      const box = $('guideText');
+      box.closest('details').open = true;
+      box.focus();
+      box.select();
+      msg.textContent = '자동 복사가 안 돼요. 아래 지침이 선택돼 있으니 길게 눌러 "복사"를 눌러 주세요.';
+    }
+    msg.hidden = false;
+  });
+  $('helpMascot').append(mascot());
+
   // ---------- 백업 ----------
   $('btnMore').addEventListener('click', () => {
     $('moreMsg').textContent = '';
@@ -1214,12 +1299,27 @@
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') scheduleSync(); });
 
   $('headMascot').append(mascot());
+  // 처음 온 사람(로그인 기록·카드 없음)에게 도움말을 한 번 자동으로 보여 준다
+  if (!readJSON(HELP_KEY, null) && !session && !cards.length) setTimeout(openHelp, 400);
   purgeOldTrash();
   renderTabs();
   renderList();
   sync();
 
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+    // 새 버전이 설치되면 한 번 자동 새로고침해서 화면과 코드가 섞이지 않게 한다
+    const hadController = Boolean(navigator.serviceWorker.controller);
+    let reloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!hadController || reloaded) return;
+      reloaded = true;
+      location.reload();
+    });
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
+      .then((reg) => {
+        reg.update().catch(() => {});
+        document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update().catch(() => {}); });
+      })
+      .catch(() => {});
   }
 })();

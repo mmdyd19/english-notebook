@@ -13,7 +13,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <link rel="icon" href="icons/icon-192.png">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=11">
 <title>내 영어 표현장</title>
 </head>
 <body>
@@ -41,11 +41,12 @@
       </div>
     </div>
     <div class="top-right">
+      <button id="btnHelp" class="help-btn" type="button" aria-label="도움말">❓</button>
       <button id="btnGrammar" class="grammar-btn" type="button">📚 기초</button>
-      <span id="count" class="count"></span>
     </div>
   </div>
   <div class="chips">
+    <span id="count" class="count"></span>
     <span id="todayChip" class="today-chip"></span>
     <button id="syncStatus" class="sync" type="button"></button>
   </div>
@@ -118,6 +119,50 @@
     <button id="btnNoteSave" class="btn primary" type="button">저장</button>
   </div>
   <p id="noteMsg" class="note"></p>
+</dialog>
+
+<!-- 도움말 -->
+<dialog id="dlgHelp" class="sheet full">
+  <div class="sheet-head"><h2>❓ 이렇게 써요</h2><button class="x" data-close type="button" aria-label="닫기">✕</button></div>
+  <div class="diary-scroll help">
+    <div class="help-hero">
+      <span id="helpMascot" class="help-mascot"></span>
+      <p>캡처한 영어를 <b>ChatGPT가 정리</b>하고, 여기에 <b>붙여 넣으면 카드</b>로 쌓여요. 복습하고, 일기 쓰고, 기초 문법도 찾아봐요.</p>
+    </div>
+
+    <section class="help-step">
+      <h3><span class="num">1</span> 가입하고 홈 화면에 추가</h3>
+      <p>위의 <b>🔒 로그인 · 회원가입</b> → <b>처음이에요</b>에서 받은 초대 코드로 가입해요.</p>
+      <p><b>아이폰</b>: 사파리 아래 공유(□↑) → 홈 화면에 추가<br><b>안드로이드</b>: 크롬 ⋮ → 홈 화면에 추가</p>
+    </section>
+
+    <section class="help-step">
+      <h3><span class="num">2</span> ChatGPT에 "영어 표현장" 프로젝트 만들기</h3>
+      <p>ChatGPT → <b>프로젝트</b> → <b>새 프로젝트</b> → 이름 아무거나 → <b>지침(Instructions)</b>에 아래 지침을 붙여 넣어요.</p>
+      <button id="btnCopyGuide" class="btn primary" type="button">📋 ChatGPT 지침 복사</button>
+      <p id="copyMsg" class="note ok" hidden></p>
+      <details class="help-guide">
+        <summary>지침 내용 보기</summary>
+        <textarea id="guideText" class="search" rows="12" readonly></textarea>
+      </details>
+    </section>
+
+    <section class="help-step">
+      <h3><span class="num">3</span> 캡처 → ChatGPT → 붙여넣기</h3>
+      <p>채팅·말해보카·음성 대화 캡처나 문장을 프로젝트에 보내요 → 답변 <b>코드블록 오른쪽 위 "복사"</b> → 앱 <b>＋ 넣기</b>에 붙여넣고 <b>카드로 저장</b>.</p>
+      <p class="note">칸이 몇 개 빠지거나 "단어 - 뜻" 목록이어도 저장돼요.</p>
+    </section>
+
+    <section class="help-step">
+      <h3><span class="num">4</span> 매일 쓰는 기능</h3>
+      <ul class="help-list">
+        <li><b>복습</b>: 하루 최대 10장. 알았어요 → 간격이 늘고, 몰랐어요 → 내일 다시.</li>
+        <li><b>📔 일기장</b>: 영어 일기·작문을 쓰면 Claude 선생님이 빨간펜과 도장으로 검사해 줘요.</li>
+        <li><b>📚 기초</b>: 시제, 조동사, 전치사 등 기초 문법 200여 개. 내 노트도 추가할 수 있어요.</li>
+        <li><b>카드 ✏️ 수정 · 🗑️ 휴지통</b>: 지운 카드는 ⋯ → 휴지통에서 30일 안에 복구돼요.</li>
+      </ul>
+    </section>
+  </div>
 </dialog>
 
 <!-- 휴지통 -->
@@ -198,8 +243,11 @@
   <p id="loginMsg" class="note"></p>
 </dialog>
 
-<script src="config.js"></script>
-<script src="grammar-base.js"></script>
-<script src="app.js"></script>
+<script src="config.js?v=11"></script>
+<script src="grammar/1-basics.js?v=11"></script>
+<script src="grammar/2-verbs.js?v=11"></script>
+<script src="grammar/3-sentences.js?v=11"></script>
+<script src="grammar/4-more.js?v=11"></script>
+<script src="app.js?v=11"></script>
 </body>
 </html>
