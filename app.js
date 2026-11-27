@@ -331,28 +331,87 @@
   $('btnLogout').addEventListener('click', () => logout(false));
 
   // ---------- 붙여넣기 파싱 ----------
+  // 느슨한 파서: 칸이 빠져도, 영어 라벨이어도, "단어 - 뜻" 목록이어도 카드로 만든다.
+  const EXTRA_ALIASES = {
+    '단어': 'expr', '표현/단어': 'expr', '영어': 'expr', '영어 표현': 'expr',
+    '한국어 뜻': 'meaning', '한글 뜻': 'meaning', '의미': 'meaning', '번역': 'natural', '해석': 'natural',
+    '문장': 'sentence', '원문 문장(원문)': 'sentence', '예시': 'example', '예문(영어)': 'example', '격식': 'register',
+    'expression': 'expr', 'phrase': 'expr', 'word': 'expr', 'term': 'expr', 'type': 'type', 'category': 'type',
+    'source': 'source', 'sentence': 'sentence', 'original': 'sentence', 'context': 'sentence',
+    'literal': 'literal', 'literal translation': 'literal', 'natural': 'natural', 'translation': 'natural',
+    'meaning': 'meaning', 'nuance': 'meaning', 'register': 'register', 'formality': 'register',
+    'my sentence': 'mine', 'original sentence (mine)': 'mine', 'example': 'example',
+  };
+  const keyOf = (label) => {
+    const k = label.trim().replace(/\s+/g, ' ');
+    return KEY_ALIASES[k] || EXTRA_ALIASES[k] || EXTRA_ALIASES[k.toLowerCase()] || null;
+  };
+  const TYPE_WORDS = [
+    [/직역|교정|correction|my mistake/i, '직역투 교정'], [/구동사|phrasal/i, '구동사'],
+    [/숙어|관용|idiom/i, '숙어'], [/슬랭|줄임|속어|slang|abbrev/i, '슬랭·줄임말'], [/단어|어휘|word|vocab/i, '단어'],
+  ];
+  function normType(t) {
+    if (!t) return '';
+    if (TYPES.includes(t.trim())) return t.trim();
+    const hit = TYPE_WORDS.find(([re]) => re.test(t));
+    return hit ? hit[1] : '';
+  }
+  const SKIP_LINE = /^\s*(```|오늘의 한 줄|today'?s (line|tip))/i;
+  function cleanLine(line) {
+    return line.replace(/^\s*(?:[-*•▪︎◦]|\d+[.)])\s+/, '').replace(/\*\*|__|`/g, '').replace(/^#+\s*/, '').trim();
+  }
+  // "fall through - 무산되다", "ngl: 솔직히", "mid = 별로" 같은 한 줄
+  function looseLine(line) {
+    const m = line.match(/^(.+?)\s*(?:\s[-–—=→]\s|\t|[:：]\s)\s*(.+)$/);
+    if (m && m[1].length <= 80) return { expr: m[1].trim(), meaning: m[2].trim() };
+    if (line.length <= 80) return { expr: line };
+    return null;
+  }
+
   function parse(text) {
-    const blocks = String(text).replace(/\r/g, '').split(/^\s*-{3,}\s*$/m);
+    const src = String(text).replace(/\r/g, '');
+    if (!clean(src)) return [];
+    // "오늘의 한 줄" 아래는 버린다
+    const body = src.split(/^\s*\**\s*오늘의 한 줄/m)[0];
+    const blocks = body.split(/^\s*(?:-{3,}|={3,}|_{3,})\s*$/m);
     const found = [];
     for (const block of blocks) {
+      const lines = block.split('\n').filter((l) => !SKIP_LINE.test(l)).map(cleanLine).filter(Boolean);
+      if (!lines.length) continue;
       const card = {};
       let lastKey = null;
-      for (let line of block.split('\n')) {
-        line = line.replace(/^\s*(?:[-*•]|\d+[.)])\s+/, '').replace(/\*\*/g, '').replace(/^#+\s*/, '');
-        if (/^\s*오늘의 한 줄/.test(line)) { lastKey = null; continue; }
-        const m = line.match(/^\s*([^:：]{1,12})\s*[:：]\s*(.*)$/);
-        const key = m ? KEY_ALIASES[m[1].trim()] : null;
+      let keyed = 0;
+      const free = [];
+      for (const line of lines) {
+        const m = line.match(/^([^:：]{1,24})\s*[:：]\s*(.*)$/);
+        const key = m ? keyOf(m[1]) : null;
         if (key) {
-          card[key] = (card[key] ? card[key] + '\n' : '') + m[2].trim();
+          keyed++;
+          if (m[2].trim()) card[key] = (card[key] ? card[key] + '\n' : '') + m[2].trim();
           lastKey = key;
-        } else if (lastKey && line.trim()) {
-          card[lastKey] += '\n' + line.trim();
+        } else if (lastKey) {
+          card[lastKey] = (card[lastKey] ? card[lastKey] + '\n' : '') + line;
+        } else {
+          free.push(line);
         }
       }
-      if (card.type && !TYPES.includes(card.type.trim())) {
-        const t = TYPES.find((x) => card.type.includes(x.split('·')[0]));
-        if (t) card.type = t;
+      if (!keyed) {
+        // 라벨이 하나도 없는 블록: 한 줄 = 카드 한 장
+        for (const line of free) {
+          const c = looseLine(line);
+          const s = c && sanitizeCard(c);
+          if (s) found.push(s);
+        }
+        continue;
       }
+      // 라벨은 있는데 "표현:"이 없으면 첫 줄(또는 원문)에서 가져온다
+      if (!card.expr) {
+        const first = free[0] ? looseLine(free[0]) : null;
+        if (first) { card.expr = first.expr; if (!card.meaning && first.meaning) card.meaning = first.meaning; }
+        else if (card.mine && card.natural) card.expr = card.natural;
+        else if (card.sentence) card.expr = card.sentence.split('\n')[0].slice(0, 80);
+      }
+      card.type = normType(card.type);
       const s = sanitizeCard(card);
       if (s) found.push(s);
     }
@@ -466,47 +525,64 @@
     parsed = [];
     $('dlgAdd').showModal();
   });
-  $('btnPasteClip').addEventListener('click', async () => {
-    try {
-      $('pasteBox').value = await navigator.clipboard.readText();
-    } catch (e) {
-      alert('클립보드를 읽지 못했어요. 입력칸을 길게 눌러 직접 붙여넣어 주세요.');
-    }
-  });
-  $('btnParse').addEventListener('click', () => {
-    parsed = parse($('pasteBox').value);
+  // 붙여넣은 글 → 바로 저장. 이미 있는 표현은 빈 칸만 새 내용으로 채운다.
+  function saveFromText(text) {
     const pv = $('preview');
     pv.replaceChildren();
+    parsed = parse(text);
     if (!parsed.length) {
-      pv.append(el('p', 'note', 'ChatGPT 정리 형식이 아니라서 바로 카드로 만들 수 없어요. 위의 📥 받은함에 넣기를 누르면 Claude 선생님이 알아서 카드로 만들어 줘요.'));
+      pv.append(el('p', 'note', '카드로 만들 표현을 찾지 못했어요. 긴 글이나 메모는 📥 메모로 보관해 두면 Claude 선생님이 정리해 줘요.'));
       return;
     }
-    const existing = new Set(cards.map((c) => norm(c.expr)));
-    let fresh = 0;
+    const byExpr = new Map(cards.map((c) => [norm(c.expr), c]));
+    const added = [];
+    const filled = [];
     for (const c of parsed) {
-      const dup = existing.has(norm(c.expr));
-      c._dup = dup;
-      if (!dup) { fresh++; existing.add(norm(c.expr)); }
+      const old = byExpr.get(norm(c.expr));
+      if (!old) {
+        if (cards.length + added.length >= MAX_CARDS) break;
+        added.push(c);
+        byExpr.set(norm(c.expr), c);
+        continue;
+      }
+      let changed = false;
+      for (const [k] of FIELDS) if (!old[k] && c[k]) { old[k] = c[k]; changed = true; }
+      if (changed) { filled.push(old); queue({ op: 'upsert', card: old }); }
+    }
+    cards = cards.concat(added);
+    saveLocal();
+    for (const c of added) queue({ op: 'upsert', card: c });
+    renderList();
+
+    const head = [`✅ ${added.length}개 저장`];
+    if (filled.length) head.push(`${filled.length}개는 이미 있어서 빈 칸만 채웠어요`);
+    const skipped = parsed.length - added.length - filled.length;
+    if (skipped > 0) head.push(`${skipped}개는 이미 있어요`);
+    pv.append(el('p', 'note ok', head.join(' · ')));
+    for (const c of added.concat(filled)) {
       const row = el('div', 'pv-item');
       row.append(el('span', 'pv-e', c.expr));
       if (c.type) row.append(badge(c.type));
-      if (dup) row.append(el('span', 'pv-dup', '이미 있음'));
+      const missing = ['meaning', 'natural'].every((k) => !c[k]) ? '뜻 없음' : '';
+      if (missing) row.append(el('span', 'pv-dup', missing));
       pv.append(row);
     }
-    const saveBtn = el('button', 'btn primary mt', fresh ? `${fresh}개 저장` : '새로 저장할 카드가 없어요');
-    saveBtn.type = 'button';
-    saveBtn.disabled = !fresh;
-    saveBtn.addEventListener('click', () => {
-      const add = parsed.filter((c) => !c._dup).map((c) => { delete c._dup; return c; });
-      if (cards.length + add.length > MAX_CARDS) { alert('카드가 너무 많아요. 백업 후 정리해 주세요.'); return; }
-      cards = cards.concat(add);
-      saveLocal();
-      for (const c of add) queue({ op: 'upsert', card: c });
-      $('dlgAdd').close();
-      renderList();
-    });
-    pv.append(saveBtn);
+    $('pasteBox').value = '';
+  }
+
+  $('btnPasteClip').addEventListener('click', async () => {
+    let text = '';
+    try {
+      text = await navigator.clipboard.readText();
+    } catch (e) {
+      $('preview').replaceChildren(el('p', 'note', '복사한 내용을 읽지 못했어요. 아래 칸을 길게 눌러 붙여넣고 "카드로 저장"을 눌러 주세요.'));
+      $('pasteBox').focus();
+      return;
+    }
+    if (!clean(text)) { $('preview').replaceChildren(el('p', 'note', '복사된 내용이 없어요. ChatGPT 결과를 먼저 복사해 주세요.')); return; }
+    saveFromText(text);
   });
+  $('btnParse').addEventListener('click', () => saveFromText($('pasteBox').value));
 
   // ---------- 복습 ----------
   function dueCards() { const t = today(); return cards.filter((c) => c.due <= t); }

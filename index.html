@@ -62,13 +62,13 @@
 <!-- 붙여넣기 -->
 <dialog id="dlgAdd" class="sheet">
   <div class="sheet-head"><h2>표현 넣기</h2><button class="x" data-close type="button" aria-label="닫기">✕</button></div>
-  <p class="note">아무거나 넣어 주세요. 채팅 내용, 문장, 단어 몇 개, 메모 모두 괜찮아요. ChatGPT 정리 형식이면 바로 카드가 되고, 아니면 받은함에 넣어 두면 Claude 선생님이 카드로 만들어 줘요.</p>
-  <textarea id="pasteBox" rows="8" placeholder="예) ngl that movie was mid lol&#10;예) fall through 뜻이 뭐지?"></textarea>
+  <p class="note">ChatGPT "영어 표현장" 프로젝트에서 받은 결과를 그대로 붙여 넣으면 카드로 저장돼요. 칸이 몇 개 빠져 있어도, "단어 - 뜻" 목록이어도 괜찮아요.</p>
+  <button id="btnPasteClip" class="btn primary" type="button">📋 복사한 것 붙여넣고 바로 저장</button>
+  <textarea id="pasteBox" class="mt" rows="7" placeholder="또는 여기에 길게 눌러 붙여넣기&#10;&#10;표현: fall through&#10;뜻·뉘앙스: 무산되다&#10;---&#10;ngl - 솔직히 말하면"></textarea>
   <div class="row">
-    <button id="btnPasteClip" class="btn" type="button">클립보드에서</button>
-    <button id="btnInbox" class="btn primary" type="button">📥 받은함에 넣기</button>
+    <button id="btnParse" class="btn primary" type="button">카드로 저장</button>
+    <button id="btnInbox" class="btn" type="button">📥 메모로 보관</button>
   </div>
-  <button id="btnParse" class="btn mt" type="button">ChatGPT 형식으로 바로 카드 만들기</button>
   <div id="preview"></div>
 </dialog>
 
