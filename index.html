@@ -53,19 +53,22 @@
 <main id="list" class="list" aria-live="polite"></main>
 
 <footer class="bar">
-  <button id="btnAdd" class="bar-btn primary" type="button">＋ 붙여넣기</button>
-  <button id="btnReview" class="bar-btn review" type="button">복습하기 <span id="dueCount" class="due-dot"></span></button>
+  <button id="btnAdd" class="bar-btn primary" type="button">＋ 넣기</button>
+  <button id="btnReview" class="bar-btn review" type="button">복습 <span id="dueCount" class="due-dot"></span></button>
+  <button id="btnDiary" class="bar-btn diary" type="button">📔 일기장</button>
   <button id="btnMore" class="bar-btn icon" type="button" aria-label="더보기">⋯</button>
 </footer>
 
 <!-- 붙여넣기 -->
 <dialog id="dlgAdd" class="sheet">
-  <div class="sheet-head"><h2>ChatGPT 결과 붙여넣기</h2><button class="x" data-close type="button" aria-label="닫기">✕</button></div>
-  <textarea id="pasteBox" rows="10" placeholder="표현: fall through&#10;유형: 구동사&#10;...&#10;---"></textarea>
+  <div class="sheet-head"><h2>표현 넣기</h2><button class="x" data-close type="button" aria-label="닫기">✕</button></div>
+  <p class="note">아무거나 넣어 주세요. 채팅 내용, 문장, 단어 몇 개, 메모 모두 괜찮아요. ChatGPT 정리 형식이면 바로 카드가 되고, 아니면 받은함에 넣어 두면 Claude 선생님이 카드로 만들어 줘요.</p>
+  <textarea id="pasteBox" rows="8" placeholder="예) ngl that movie was mid lol&#10;예) fall through 뜻이 뭐지?"></textarea>
   <div class="row">
-    <button id="btnPasteClip" class="btn" type="button">클립보드에서 가져오기</button>
-    <button id="btnParse" class="btn primary" type="button">카드 만들기</button>
+    <button id="btnPasteClip" class="btn" type="button">클립보드에서</button>
+    <button id="btnInbox" class="btn primary" type="button">📥 받은함에 넣기</button>
   </div>
+  <button id="btnParse" class="btn mt" type="button">ChatGPT 형식으로 바로 카드 만들기</button>
   <div id="preview"></div>
 </dialog>
 
@@ -85,6 +88,35 @@
   <div class="progress" aria-hidden="true"><span id="revBar"></span></div>
   <div id="revCard" class="rev-card"></div>
   <div id="revActions" class="row"></div>
+</dialog>
+
+<!-- 일기장 -->
+<dialog id="dlgDiary" class="sheet full">
+  <div class="sheet-head"><h2>📔 내 일기장</h2><button class="x" data-close type="button" aria-label="닫기">✕</button></div>
+  <div class="seg" role="tablist">
+    <button class="seg-btn" data-kind="diary" type="button" role="tab" aria-selected="true">영어 일기</button>
+    <button class="seg-btn" data-kind="writing" type="button" role="tab" aria-selected="false">작문 연습</button>
+    <button class="seg-btn" data-kind="inbox" type="button" role="tab" aria-selected="false">받은함</button>
+  </div>
+  <div class="diary-scroll">
+    <div id="composer" class="composer">
+      <div id="targetBox" class="target-box">
+        <div class="target-head"><span id="targetLabel">오늘 써 볼 표현</span><button id="btnShuffle" class="mini" type="button">🔀 바꾸기</button></div>
+        <div id="targetChips" class="target-chips"></div>
+      </div>
+      <textarea id="entryBody" rows="7"></textarea>
+      <button id="btnSaveEntry" class="btn primary" type="button">검사 맡기기 ✏️</button>
+      <p id="entryMsg" class="note"></p>
+    </div>
+    <div id="entryList" class="entry-list"></div>
+  </div>
+</dialog>
+
+<!-- 일기 상세 -->
+<dialog id="dlgEntry" class="sheet full">
+  <div class="sheet-head"><h2 id="entryTitle"></h2><button class="x" data-close type="button" aria-label="닫기">✕</button></div>
+  <div id="entryView" class="diary-scroll"></div>
+  <div class="row"><button id="btnDeleteEntry" class="btn danger" type="button">삭제</button></div>
 </dialog>
 
 <!-- 더보기 -->

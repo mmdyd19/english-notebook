@@ -1,6 +1,6 @@
 'use strict';
 // 오프라인에서도 열리도록 앱 파일만 캐시한다. 학습 데이터는 캐시하지 않는다(localStorage).
-const CACHE = 'en-notebook-v4';
+const CACHE = 'en-notebook-v5';
 const FILES = ['./', 'index.html', 'style.css', 'config.js', 'app.js', 'manifest.json', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', (e) => {

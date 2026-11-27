@@ -149,10 +149,10 @@
       throw e;
     }
   }
-  async function rest(method, query, body, extraHeaders) {
+  async function rest(method, query, body, extraHeaders, table) {
     const t = await token();
     if (!t) throw new Error('not logged in');
-    const res = await fetch(`${API}/rest/v1/cards${query}`, {
+    const res = await fetch(`${API}/rest/v1/${table || 'cards'}${query}`, {
       method,
       headers: Object.assign({ apikey: KEY, Authorization: `Bearer ${t}`, 'Content-Type': 'application/json' }, extraHeaders || {}),
       body: body ? JSON.stringify(body) : undefined,
@@ -196,7 +196,13 @@
       }
       const rows = await rest('GET', '?select=*&order=created.desc&limit=5000');
       if (Array.isArray(rows)) {
-        cards = rows.map(fromRow).filter(Boolean);
+        // 서버에서 받는 사이에 새로 생긴 변경(아직 못 보낸 것)은 덮어쓰지 않고 살린다
+        const fresh = rows.map(fromRow).filter(Boolean);
+        const deleted = new Set(pending.filter((p) => p.op === 'delete').map((p) => p.id));
+        const waiting = pending.filter((p) => p.op === 'upsert').map((p) => p.card);
+        const waitIds = new Set(waiting.map((c) => c.id));
+        cards = fresh.filter((c) => !deleted.has(c.id) && !waitIds.has(c.id)).concat(waiting);
+        if (pending.length) scheduleSync();
         saveLocal();
         renderList();
       }
@@ -472,7 +478,7 @@
     const pv = $('preview');
     pv.replaceChildren();
     if (!parsed.length) {
-      pv.append(el('p', 'note', '카드를 찾지 못했어요. "표현:" 으로 시작하는 줄이 있는지 확인해 주세요.'));
+      pv.append(el('p', 'note', 'ChatGPT 정리 형식이 아니라서 바로 카드로 만들 수 없어요. 위의 📥 받은함에 넣기를 누르면 Claude 선생님이 알아서 카드로 만들어 줘요.'));
       return;
     }
     const existing = new Set(cards.map((c) => norm(c.expr)));
@@ -561,6 +567,215 @@
     qi++;
     showQuestion();
   }
+
+  // ---------- 받은함 · 일기 · 작문 (entries 표) ----------
+  // 검사 결과(feedback)는 PC의 Claude 선생님만 쓸 수 있다. 앱은 쓰기·읽기·삭제만.
+  const KIND_INFO = {
+    diary: { label: '영어 일기', ph: '오늘 있었던 일을 영어로 써 보세요.\n막히는 부분은 한국어로 써도 괜찮아요!', target: '오늘 써 볼 표현 (써 보면 좋아요)', n: 3 },
+    writing: { label: '작문 연습', ph: '위 표현들을 넣어서 문장을 만들어 보세요.\n한 표현에 한 문장씩!', target: '이 표현들로 문장 만들기', n: 4 },
+    inbox: { label: '받은함', ph: '', target: '', n: 0 },
+  };
+  const STAMPS = { '참 잘했어요': '💮', '잘했어요': '🌸', '조금만 더': '🌱' };
+  let diaryKind = 'diary';
+  let entries = [];
+  let targets = [];
+
+  function needLogin() {
+    if (CLOUD && session) return false;
+    alert('먼저 로그인해 주세요. 일기와 받은함은 서버에 저장돼요.');
+    return true;
+  }
+  async function addEntry(kind, body, targetExprs) {
+    const row = {
+      id: crypto.randomUUID(), kind, body: clean(body).slice(0, 8000) || '',
+      target_exprs: targetExprs ? clean(targetExprs).slice(0, 1000) : null,
+    };
+    if (!row.body) throw new Error('empty');
+    await rest('POST', '', [row], { Prefer: 'return=minimal' }, 'entries');
+  }
+
+  $('btnInbox').addEventListener('click', async () => {
+    const text = $('pasteBox').value;
+    if (!clean(text)) { alert('넣을 내용을 적어 주세요.'); return; }
+    if (needLogin()) return;
+    $('btnInbox').disabled = true;
+    try {
+      await addEntry('inbox', text);
+      $('preview').replaceChildren(el('p', 'note ok', '📥 받은함에 넣었어요! PC에서 Claude에게 "검사해줘"라고 하면 카드로 만들어 줘요.'));
+      $('pasteBox').value = '';
+    } catch (e) {
+      $('preview').replaceChildren(el('p', 'note', '저장하지 못했어요. 인터넷 연결을 확인해 주세요.'));
+    } finally {
+      $('btnInbox').disabled = false;
+    }
+  });
+
+  function pickTargets() {
+    const n = KIND_INFO[diaryKind].n;
+    const pool = cards.filter((c) => !c.used);
+    const src = (pool.length >= n ? pool : cards).slice().sort(() => Math.random() - 0.5);
+    targets = src.slice(0, n).map((c) => c.expr);
+    const box = $('targetChips');
+    box.replaceChildren();
+    if (!targets.length) { box.append(el('span', 'note', '카드가 생기면 여기에 써 볼 표현이 나와요.')); return; }
+    for (const t of targets) {
+      const c = cards.find((x) => x.expr === t);
+      const chip = el('span', 'target-chip', t);
+      if (c && c.type) chip.dataset.t = c.type;
+      box.append(chip);
+    }
+  }
+  $('btnShuffle').addEventListener('click', pickTargets);
+
+  function setDiaryKind(kind) {
+    diaryKind = kind;
+    document.querySelectorAll('#dlgDiary .seg-btn').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.kind === kind)));
+    const info = KIND_INFO[kind];
+    $('composer').hidden = kind === 'inbox';
+    $('targetLabel').textContent = info.target;
+    $('entryBody').placeholder = info.ph;
+    $('entryMsg').textContent = '';
+    if (kind !== 'inbox') pickTargets();
+    loadEntries();
+  }
+  document.querySelectorAll('#dlgDiary .seg-btn').forEach((b) => b.addEventListener('click', () => setDiaryKind(b.dataset.kind)));
+
+  $('btnDiary').addEventListener('click', () => {
+    if (needLogin()) return;
+    $('dlgDiary').showModal();
+    setDiaryKind(diaryKind);
+  });
+
+  async function loadEntries() {
+    const list = $('entryList');
+    list.replaceChildren(el('p', 'note', '불러오는 중…'));
+    try {
+      const rows = await rest('GET', `?select=*&kind=eq.${diaryKind}&order=created_at.desc&limit=100`, null, null, 'entries');
+      entries = Array.isArray(rows) ? rows : [];
+      renderEntries();
+    } catch (e) {
+      list.replaceChildren(el('p', 'note', '불러오지 못했어요. 인터넷 연결을 확인해 주세요.'));
+    }
+  }
+  function fmtDate(iso) {
+    const d = new Date(iso);
+    if (isNaN(d)) return '';
+    return `${d.getMonth() + 1}월 ${d.getDate()}일`;
+  }
+  function renderEntries() {
+    const list = $('entryList');
+    list.replaceChildren();
+    if (!entries.length) {
+      const box = el('div', 'empty');
+      box.append(mascot(), el('p', '', diaryKind === 'inbox' ? '받은함이 비어 있어요.\n＋ 넣기에서 아무거나 넣어 보세요.' : '아직 쓴 글이 없어요.\n위에서 첫 글을 써 볼까요?'));
+      list.append(box);
+      return;
+    }
+    for (const en of entries) {
+      const item = el('button', 'entry-item');
+      item.type = 'button';
+      const top = el('div', 'entry-top');
+      top.append(el('span', 'entry-date', fmtDate(en.created_at)));
+      const checked = en.status === 'checked';
+      const stamp = checked && en.feedback && typeof en.feedback.stamp === 'string' ? en.feedback.stamp : '';
+      top.append(el('span', 'entry-status' + (checked ? ' done' : ''),
+        checked ? `${STAMPS[stamp] || '💮'} ${diaryKind === 'inbox' ? '카드로 정리 완료' : '검사 완료'}` : (diaryKind === 'inbox' ? '⏳ 정리 기다리는 중' : '⏳ 검사 기다리는 중')));
+      item.append(top, el('div', 'entry-body', String(en.body).split('\n').slice(0, 2).join(' ')));
+      item.addEventListener('click', () => openEntry(en));
+      list.append(item);
+    }
+  }
+
+  $('btnSaveEntry').addEventListener('click', async () => {
+    const body = $('entryBody').value;
+    if (clean(body).length < 3) { $('entryMsg').textContent = '조금만 더 써 볼까요?'; return; }
+    $('btnSaveEntry').disabled = true;
+    try {
+      await addEntry(diaryKind, body, targets.join(' | '));
+      $('entryBody').value = '';
+      $('entryMsg').textContent = '✏️ 검사 맡겼어요! PC에서 Claude에게 "일기 검사해줘"라고 하면 빨간펜으로 봐 줘요.';
+      pickTargets();
+      loadEntries();
+    } catch (e) {
+      $('entryMsg').textContent = '저장하지 못했어요. 인터넷 연결을 확인해 주세요.';
+    } finally {
+      $('btnSaveEntry').disabled = false;
+    }
+  });
+
+  let openEntryId = null;
+  function section(title, ...children) {
+    const s = el('div', 'fb-section');
+    s.append(el('div', 'fb-title', title), ...children);
+    return s;
+  }
+  const str = (v) => (typeof v === 'string' ? v.slice(0, 8000) : '');
+  const arr = (v) => (Array.isArray(v) ? v.slice(0, 50) : []);
+
+  function openEntry(en) {
+    openEntryId = en.id;
+    $('entryTitle').textContent = `${fmtDate(en.created_at)} ${KIND_INFO[en.kind] ? KIND_INFO[en.kind].label : ''}`;
+    const view = $('entryView');
+    view.replaceChildren();
+    const fb = en.status === 'checked' && en.feedback && typeof en.feedback === 'object' ? en.feedback : null;
+
+    if (fb && str(fb.stamp)) {
+      const st = el('div', 'stamp pop');
+      st.append(el('span', 'stamp-ico', STAMPS[fb.stamp] || '💮'), el('span', 'stamp-text', str(fb.stamp)));
+      view.append(st);
+    }
+    if (en.target_exprs) view.append(section('써 보기로 한 표현', el('p', 'fb-text', en.target_exprs.split(' | ').join(', '))));
+    view.append(section('내가 쓴 글', el('p', 'fb-text mine', en.body)));
+
+    if (!fb) {
+      view.append(el('p', 'note wait', en.kind === 'inbox'
+        ? '⏳ 아직 정리 전이에요. PC에서 Claude에게 "검사해줘"라고 해 주세요.'
+        : '⏳ 아직 검사 전이에요. PC에서 Claude에게 "일기 검사해줘"라고 해 주세요.'));
+    } else {
+      if (str(fb.corrected)) view.append(section('✏️ 고친 글', el('p', 'fb-text corrected', str(fb.corrected))));
+      const notes = arr(fb.notes).filter((n) => n && typeof n === 'object');
+      if (notes.length) {
+        const ul = el('div', 'redpen');
+        for (const n of notes) {
+          const row = el('div', 'redpen-item');
+          const line = el('div', 'redpen-line');
+          if (str(n.from)) line.append(el('s', 'from', str(n.from)));
+          if (str(n.from) && str(n.to)) line.append(el('span', 'arrow', '→'));
+          if (str(n.to)) line.append(el('b', 'to', str(n.to)));
+          row.append(line);
+          if (str(n.why)) row.append(el('div', 'why', str(n.why)));
+          ul.append(row);
+        }
+        view.append(section('🖍️ 빨간펜', ul));
+      }
+      const tips = arr(fb.tips).map(str).filter(Boolean);
+      if (tips.length) {
+        const ul = el('ul', 'tips');
+        for (const t of tips) ul.append(el('li', '', t));
+        view.append(section('💡 이렇게도 말해요', ul));
+      }
+      const used = arr(fb.used).map(str).filter(Boolean);
+      if (used.length) view.append(section('✅ 잘 써먹은 표현', el('p', 'fb-text', used.join(', '))));
+      const made = arr(fb.cards).map(str).filter(Boolean);
+      if (made.length) view.append(section('🗂️ 새로 만든 카드', el('p', 'fb-text', made.join(', '))));
+      if (str(fb.praise)) {
+        const bubble = el('div', 'teacher');
+        bubble.append(mascot(), el('p', 'teacher-say', str(fb.praise)));
+        view.append(bubble);
+      }
+    }
+    $('dlgEntry').showModal();
+  }
+  $('btnDeleteEntry').addEventListener('click', async () => {
+    if (!openEntryId || !UUID_RE.test(openEntryId) || !confirm('이 글을 삭제할까요?')) return;
+    try {
+      await rest('DELETE', `?id=eq.${openEntryId}`, null, null, 'entries');
+      $('dlgEntry').close();
+      loadEntries();
+    } catch (e) {
+      alert('삭제하지 못했어요. 인터넷 연결을 확인해 주세요.');
+    }
+  });
 
   // ---------- 백업 ----------
   $('btnMore').addEventListener('click', () => {

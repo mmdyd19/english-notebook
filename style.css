@@ -245,6 +245,68 @@ textarea:focus { border-color: var(--primary); }
 .rev-done { margin: auto; text-align: center; white-space: pre-line; display: grid; justify-items: center; gap: 12px; font-size: 19px; font-weight: 800; }
 .rev-done .mascot { width: 130px; }
 
+/* ---------- 하단 4버튼 ---------- */
+.bar { gap: 8px; }
+.bar-btn { font-size: 15px; padding: 14px 4px; white-space: nowrap; }
+.bar-btn.diary { background: var(--slang-bg); color: var(--slang); box-shadow: 0 4px 0 var(--line), inset 0 0 0 2px var(--slang-bg); }
+.bar-btn.icon { flex: 0 0 48px; }
+.note.ok { color: var(--phr); font-weight: 700; }
+
+/* ---------- 일기장 ---------- */
+.diary-scroll { flex: 1; overflow-y: auto; display: grid; gap: 14px; align-content: start; padding-bottom: 8px; }
+.composer { display: grid; gap: 10px; background: var(--card); border: 2px solid var(--line); border-radius: 24px; padding: 14px; box-shadow: 0 4px 0 var(--line); }
+.composer textarea {
+  min-height: 150px; line-height: 1.9;
+  background-image: repeating-linear-gradient(to bottom, transparent 0 calc(1.9em - 1px), var(--line) calc(1.9em - 1px) 1.9em);
+  background-attachment: local; background-position: 0 10px;
+}
+.target-box { display: grid; gap: 8px; }
+.target-head { display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 800; color: var(--sub); }
+.mini { border: 0; background: var(--chip); border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 800; color: var(--sub); }
+.target-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.target-chip { font-weight: 800; font-size: 14px; border-radius: 999px; padding: 4px 12px; background: var(--chip); }
+.target-chip[data-t="단어"] { background: var(--word-bg); color: var(--word); }
+.target-chip[data-t="숙어"] { background: var(--idiom-bg); color: var(--idiom); }
+.target-chip[data-t="구동사"] { background: var(--phr-bg); color: var(--phr); }
+.target-chip[data-t="슬랭·줄임말"] { background: var(--slang-bg); color: var(--slang); }
+.target-chip[data-t="직역투 교정"] { background: var(--fix-bg); color: var(--fix); }
+.entry-list { display: grid; gap: 10px; }
+.entry-item { display: grid; gap: 4px; text-align: left; width: 100%; background: var(--card); border: 2px solid var(--line); border-radius: 20px; padding: 12px 14px; box-shadow: 0 3px 0 var(--line); }
+.entry-item:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--line); }
+.entry-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.entry-date { font-weight: 800; }
+.entry-status { font-size: 12px; font-weight: 800; border-radius: 999px; padding: 2px 9px; background: var(--idiom-bg); color: var(--idiom); white-space: nowrap; }
+.entry-status.done { background: var(--slang-bg); color: var(--slang); }
+.entry-body { color: var(--sub); font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---------- 검사 결과 ---------- */
+.stamp {
+  justify-self: center; display: grid; justify-items: center; gap: 2px;
+  width: 132px; height: 132px; align-content: center; border-radius: 50%;
+  border: 4px double var(--bad); color: var(--bad); transform: rotate(-10deg);
+  background: var(--card);
+}
+.stamp-ico { font-size: 40px; line-height: 1; }
+.stamp-text { font-weight: 800; font-size: 16px; }
+.stamp.pop { animation: stampIn .35s ease-out; }
+@keyframes stampIn { 0% { transform: rotate(-10deg) scale(1.6); opacity: 0; } 100% { transform: rotate(-10deg) scale(1); opacity: 1; } }
+.fb-section { display: grid; gap: 6px; background: var(--card); border-radius: 18px; padding: 12px 14px; box-shadow: var(--shadow); }
+.fb-title { font-size: 13px; font-weight: 800; color: var(--primary); }
+.fb-text { margin: 0; white-space: pre-wrap; word-break: break-word; line-height: 1.7; }
+.fb-text.corrected { color: var(--text); }
+.redpen { display: grid; gap: 10px; }
+.redpen-item { display: grid; gap: 2px; border-left: 3px solid var(--bad); padding-left: 10px; }
+.redpen-line { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
+.redpen-line .from { color: var(--sub); text-decoration-color: var(--bad); text-decoration-thickness: 2px; }
+.redpen-line .arrow { color: var(--bad); font-weight: 800; }
+.redpen-line .to { color: var(--bad-dark); }
+.redpen .why { font-size: 13px; color: var(--sub); }
+.tips { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.teacher { display: flex; gap: 10px; align-items: center; }
+.teacher .mascot { width: 54px; flex: none; }
+.teacher-say { margin: 0; background: var(--idiom-bg); color: var(--text); border-radius: 18px 18px 18px 4px; padding: 10px 14px; font-weight: 700; }
+.note.wait { text-align: center; font-weight: 700; }
+
 [hidden] { display: none !important; }
 
 /* 아이패드·PC: 가운데 정렬 + 카드 2열 */
